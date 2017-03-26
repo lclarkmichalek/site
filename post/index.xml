@@ -7,7 +7,18 @@
     <language>en-gb</language>
     
     
-    <updated>Sun, 05 Apr 2015 15:19:12 BST</updated>
+    <updated>Sun, 26 Mar 2017 21:35:50 BST</updated>
+    
+    <item>
+      <title>The applications of Top Gun to software engineering</title>
+      <link>http://generictestdomain.net/post/topgun/</link>
+      <pubDate>Sun, 26 Mar 2017 21:35:50 BST</pubDate>
+      
+      <guid>http://generictestdomain.net/post/topgun/</guid>
+      <description>Top Gun has a lot to teach us about software development. Through a recent viewing, I noticed a number of useful parallels and perpendicular. Significant spoilers ahead
+Parallels Th crises that the Top Gun staff face are different from the crises that a software developer faces. However, we can still learn from their approaches to failure and learning.
+On failed deployments  Viper: The simple fact is you feel responsible for Goose and you have a confidence problem.</description>
+    </item>
     
     <item>
       <title>Weave is kinda slow</title>

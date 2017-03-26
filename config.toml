@@ -1,0 +1,5 @@
+languageCode = "en-gb"
+title = "generic test domain"
+baseURL = "http://generictestdomain.net/"
+
+publishDir = "docs"

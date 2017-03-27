@@ -8,13 +8,14 @@ author = "Laurie Clark-Michalek"
 
 +++
 
-Top Gun has a lot to teach us about software development. Through a recent
-viewing, I noticed a number of useful parallels and perpendicular. **Significant
-spoilers ahead**
+Top Gun has a lot to teach us about software development. During a recent
+viewing, I noticed a number of useful parallels and perpendiculars between the
+dual disciplines of piloting fighter aircraft in action films and developing
+robust software. **Significant spoilers ahead**
 
 ## Parallels
 
-Th crises that the Top Gun staff face are different from the crises that a
+The crises that the Top Gun staff face are different from the crises that a
 software developer faces. However, we can still learn from their approaches to
 failure and learning.
 
@@ -84,3 +85,32 @@ shouldn't be a cause to dislike anyone. Someone being dangerous is a reason to
 look at the process that is causing them to be dangerous and the systems that
 incentivise that danger. Being blameless shoudn't stop after the postmortem is
 over.
+
+## Perpendiculars
+
+Despite all appearances, the life of a fighter pilot in a 1980s action film is
+different from the life of a software engineer in a few key ways.
+
+### No one dies (in most cases)
+
+*Note*: There are jobs where this doesn't apply. Most jobs, it does. But if you
+work somewhere where your software is critical to people's lives, then I don't
+know how much value this will provide.
+
+> *Goose*: The defense department regrets to inform you that your sons are dead because they were stupid.
+
+I work for a firm that helps other firms sell things. When our systems go down,
+nobody dies. This is a super weapon. Every time there's an incident, I already
+know the upper bound. Nobody will die. This gives me the space to stop panicing.
+I can think before taking an action. I can inform others, I can document what
+I'm doing, I can take the time to be careful and deliberate.
+
+> *Maverick*: You don't have time to think up there. If you think, you're dead.
+
+And there's no clearer difference to me. I've had incidents in the past that I
+could have fixed immediately, but where I instead took 5 minutes to fetch a
+coworker, and show them the process of debugging and fixing the issue.
+
+Humans have a tendency to panic, and an incident is not a situation where panic
+is constructive. 'No one dies' is my mantra to keep panic from being a factor in
+my incidents.

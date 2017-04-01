@@ -53,16 +53,21 @@
       <article class="post-content">
       
 
-<p>Top Gun has a lot to teach us about software development. During a recent
-viewing, I noticed a number of useful parallels and perpendiculars between the
-dual disciplines of piloting fighter aircraft in action films and developing
-robust software. <strong>Significant spoilers ahead</strong></p>
+<p>The Merriam-Webster dictionary defines Top Gun as &lsquo;a 1986 American romantic
+military action drama film directed by Tony Scott&rsquo;. This definition might serve
+us well at the local pub quiz, but there is much more to learn about this film.
+During a recent viewing, I realised that there were a large number of useful
+parallels and not so parallels between the disciplines of piloting fighter
+aircraft in 80&rsquo;s action films and developing robust software.</p>
+
+<p>Needless to say, this post contains <strong>significant Top Gun spoilers.</strong></p>
 
 <h2 id="parallels">Parallels</h2>
 
-<p>The crises that the Top Gun staff face are different from the crises that a
-software developer faces. However, we can still learn from their approaches to
-failure and learning.</p>
+<p>The crises that the Top Gun staff face are superficially different from the
+crises that a software development team faces, but a deeper inspection yields
+some hard to ignore parallels. A few key scenes show that these worlds are
+similar on a deep and meaningful level.</p>
 
 <h3 id="on-failed-deployments">On failed deployments</h3>
 
@@ -71,16 +76,17 @@ failure and learning.</p>
 </blockquote>
 
 <p>Blameless postmortems have become an accepted part of the software industry,
-which is a great thing. They&rsquo;re practised to various degrees of quality around
-the place, but generally aim to figure out what went wrong and what can be
-improved, without assuming bad faith on any member of the team.</p>
+which is a great thing. They&rsquo;re practised to various degrees of quality and
+every company has a different process, but generally aim to figure out what went
+wrong and what can be improved, without assuming bad faith from any member of
+the team.</p>
 
 <p>The military tribunal that Maverick had to appear before was not designed to be
 blameless, but he emerged with his record clean. Yet he still feels guilty,
 given his friend just died, and actions he took could have influenced that.</p>
 
-<p>In software development, when an action, such as a deployment, or a database
-migration, causes an issue, we do our postmortem. We identify root causes, and
+<p>In software development, when an action such as a deployment or a database
+migration causes an issue we do our postmortem. We identify root causes, and
 we fix the issues with technology and process that contributed to the issue (the
 social and structural issues we sweep under the rug and blame management for).
 However, after all that, an engineer can still feel scared to perform that
@@ -100,11 +106,10 @@ that change again. Find a typo to fix, an error to check, a column to add,
 basically anything. The most important time to deploy is as soon as possible
 after an incident.</p>
 
-<p>Without confidence, you stop deploying frequently. Your bugs build up. You get
-bigger releases. You have more failures. Your confidence gets worse. When
-something goes wrong in your team, make sure that your plans include checking
-people&rsquo;s confidence in the aftermath, and taking remidatial actions if
-neccesary.</p>
+<p>Without confidence, you stop deploying frequently. Your bugs build up. You have
+more changes per release. You have more failures. Your confidence gets worse.
+When something goes wrong in your team, make sure that your plans include checking
+people&rsquo;s confidence in the aftermath, and taking remedial actions if necessary.</p>
 
 <h3 id="on-teamwork">On teamwork</h3>
 
@@ -139,12 +144,14 @@ look at the process that is causing them to be dangerous and the systems that
 incentivise that danger. Being blameless shoudn&rsquo;t stop after the postmortem is
 over.</p>
 
-<h2 id="perpendiculars">Perpendiculars</h2>
+<h2 id="not-so-parallels">Not so parallels</h2>
 
-<p>Despite all appearances, the life of a fighter pilot in a 1980s action film is
-different from the life of a software engineer in a few key ways.</p>
+<p>Of course, some of the differences are not so superficial, but that does not
+mean they are not useful. By looking at some of the limitations that Top Gun
+pilots have that software developers do not have, we can start to think about
+how we can take full advantage of our capabilities.</p>
 
-<h3 id="no-one-dies-in-most-cases">No one dies (in most cases)</h3>
+<h3 id="on-the-consequences-of-a-crisis">On the consequences of a crisis</h3>
 
 <p><em>Note</em>: There are jobs where this doesn&rsquo;t apply. Most jobs, it does. But if you
 work somewhere where your software is critical to people&rsquo;s lives, then I don&rsquo;t
@@ -160,17 +167,47 @@ know the upper bound. Nobody will die. This gives me the space to stop panicing.
 I can think before taking an action. I can inform others, I can document what
 I&rsquo;m doing, I can take the time to be careful and deliberate.</p>
 
+<h3 id="on-time-sensitivity">On time sensitivity</h3>
+
 <blockquote>
 <p><em>Maverick</em>: You don&rsquo;t have time to think up there. If you think, you&rsquo;re dead.</p>
 </blockquote>
 
-<p>And there&rsquo;s no clearer difference to me. I&rsquo;ve had incidents in the past that I
-could have fixed immediately, but where I instead took 5 minutes to fetch a
-coworker, and show them the process of debugging and fixing the issue.</p>
+<p>And there&rsquo;s no clearer difference between the two roles to me. I&rsquo;ve had
+incidents in the past that I could have fixed immediately, but where I instead
+took 5 minutes to fetch a coworker, and show them the process of debugging and
+fixing the issue. We have that luxury in computing. An incident will usually
+take at least 15 minutes to handle, so we can always take the few seconds to
+grab a pair, to document our process, and to double check our thinking.</p>
+
+<blockquote>
+<p><em>Officer</em>: It&rsquo;ll take ten minutes.
+<em>Stinger</em>: Bullshit ten minutes! This thing will be over in two minutes! Get on it!</p>
+</blockquote>
 
 <p>Humans have a tendency to panic, and an incident is not a situation where panic
 is constructive. &lsquo;No one dies&rsquo; is my mantra to keep panic from being a factor in
 my incidents.</p>
+
+<h3 id="on-competiton">On competiton</h3>
+
+<blockquote>
+<p><em>Iceman</em>: The plaque for alternates is down in the ladies room</p>
+</blockquote>
+
+<p>The Top Gun academy is set up to be based around a competition. Each pair that
+comes in earns points as they fly sorties against the instructors, and those
+points add up to determine their ranking at the end of the course. This is a
+horrible way to run a software engineering team.</p>
+
+<p>The idea of a null sum game is easy to induce in people. Top Gun does it by
+stating that &lsquo;there are no prizes for second place&rsquo;. This causes the trainees to
+fly like asses, producing suboptimal results. The two most notable examples of
+this are 1) when Maverick abandons his wingman, Iceman, to persue a target
+alone. They both fail to achive their goals. And 2) when Iceman refuses to move
+to give Maverick a shot, which indirectly causes an accident, and Goose&rsquo;s death.
+These incidents are a fault not in the characters, but in the design of Top
+Gun&rsquo;s incentive system.</p>
 
       </article>
 

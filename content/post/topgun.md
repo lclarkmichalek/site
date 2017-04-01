@@ -112,6 +112,16 @@ know the upper bound. Nobody will die. This gives me the space to stop panicing.
 I can think before taking an action. I can inform others, I can document what
 I'm doing, I can take the time to be careful and deliberate.
 
+Humans have a tendency to panic, and an incident is not a situation where panic
+is constructive. 'No one dies' is my mantra to keep panic from being a factor in
+my incidents.
+
+Of course, someone dying is still an incredibly high ceiling. Discovering what
+the worst case scenario is for a system is not obvious, and working out the
+'incident impact' distribution is takes time. When you join a team, you don't
+have any context on what something breaking means. Getting involved in incidents
+from day one helps give you that context, as well as building up a mental
+runbook (obviously, having runbooks written down is better, but both is best).
 
 ### On time sensitivity
 
@@ -127,9 +137,19 @@ grab a pair, to document our process, and to double check our thinking.
 > *Officer*: It'll take ten minutes.
 > *Stinger*: Bullshit ten minutes! This thing will be over in two minutes! Get on it!
 
-Humans have a tendency to panic, and an incident is not a situation where panic
-is constructive. 'No one dies' is my mantra to keep panic from being a factor in
-my incidents.
+Most of my services don't serve a crazy amount of traffic. They do enough that
+looking at the logs isn't a viable monitoring strategy, but not enough that any
+change instantly shows up in my metrics. When I look at my Grafana dashboards, I
+don't look at the point representing 'now' on any of the plots. Because my
+quantities are't Google high, there's a decent chance that there's significant
+variance on the points (even more so during an incident), and 9 times out of 10
+a value that suggests something interesting happening will quickly regress to
+the mean.
+
+There are plenty of systems where two minutes and less is critical, but we often
+have the ability to design systems where that isn't true. We use queues to defer
+processing, we use redundancy to tolerate failure, we use a whole host of
+techniques to help us avoid the question 'why is this pager ruining my life'.
 
 ### On competiton
 

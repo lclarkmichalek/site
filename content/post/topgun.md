@@ -8,32 +8,38 @@ author = "Laurie Clark-Michalek"
 
 +++
 
-Top Gun has a lot to teach us about software development. During a recent
-viewing, I noticed a number of useful parallels and perpendiculars between the
-dual disciplines of piloting fighter aircraft in action films and developing
-robust software. **Significant spoilers ahead**
+The Merriam-Webster dictionary defines Top Gun as 'a 1986 American romantic
+military action drama film directed by Tony Scott'. This definition might serve
+us well at the local pub quiz, but there is much more to learn about this film.
+During a recent viewing, I realised that there were a large number of useful
+parallels and not so parallels between the disciplines of piloting fighter
+aircraft in 80's action films and developing robust software.
+
+Needless to say, this post contains **significant Top Gun spoilers.**
 
 ## Parallels
 
-The crises that the Top Gun staff face are different from the crises that a
-software developer faces. However, we can still learn from their approaches to
-failure and learning.
+The crises that the Top Gun staff face are superficially different from the
+crises that a software development team faces, but a deeper inspection yields
+some hard to ignore parallels. A few key scenes show that these worlds are
+similar on a deep and meaningful level.
 
 ### On failed deployments
 
 > *Viper*: The simple fact is you feel responsible for Goose and you have a confidence problem. Now I'm not gonna sit here and blow sunshine up your ass, Lieutenant. A good pilot is compelled to always evaluate what's happened, so he can apply what he's learned.
 
 Blameless postmortems have become an accepted part of the software industry,
-which is a great thing. They're practised to various degrees of quality around
-the place, but generally aim to figure out what went wrong and what can be
-improved, without assuming bad faith on any member of the team.
+which is a great thing. They're practised to various degrees of quality and
+every company has a different process, but generally aim to figure out what went
+wrong and what can be improved, without assuming bad faith from any member of
+the team.
 
 The military tribunal that Maverick had to appear before was not designed to be
 blameless, but he emerged with his record clean. Yet he still feels guilty,
 given his friend just died, and actions he took could have influenced that.
 
-In software development, when an action, such as a deployment, or a database
-migration, causes an issue, we do our postmortem. We identify root causes, and
+In software development, when an action such as a deployment or a database
+migration causes an issue we do our postmortem. We identify root causes, and
 we fix the issues with technology and process that contributed to the issue (the
 social and structural issues we sweep under the rug and blame management for).
 However, after all that, an engineer can still feel scared to perform that
@@ -51,11 +57,10 @@ that change again. Find a typo to fix, an error to check, a column to add,
 basically anything. The most important time to deploy is as soon as possible
 after an incident.
 
-Without confidence, you stop deploying frequently. Your bugs build up. You get
-bigger releases. You have more failures. Your confidence gets worse. When
-something goes wrong in your team, make sure that your plans include checking
-people's confidence in the aftermath, and taking remidatial actions if
-neccesary.
+Without confidence, you stop deploying frequently. Your bugs build up. You have
+more changes per release. You have more failures. Your confidence gets worse.
+When something goes wrong in your team, make sure that your plans include checking
+people's confidence in the aftermath, and taking remedial actions if necessary.
 
 ### On teamwork
 
@@ -86,12 +91,14 @@ look at the process that is causing them to be dangerous and the systems that
 incentivise that danger. Being blameless shoudn't stop after the postmortem is
 over.
 
-## Perpendiculars
+## Not so parallels
 
-Despite all appearances, the life of a fighter pilot in a 1980s action film is
-different from the life of a software engineer in a few key ways.
+Of course, some of the differences are not so superficial, but that does not
+mean they are not useful. By looking at some of the limitations that Top Gun
+pilots have that software developers do not have, we can start to think about
+how we can take full advantage of our capabilities.
 
-### No one dies (in most cases)
+### On the consequences of a crisis
 
 *Note*: There are jobs where this doesn't apply. Most jobs, it does. But if you
 work somewhere where your software is critical to people's lives, then I don't
@@ -105,12 +112,41 @@ know the upper bound. Nobody will die. This gives me the space to stop panicing.
 I can think before taking an action. I can inform others, I can document what
 I'm doing, I can take the time to be careful and deliberate.
 
+
+### On time sensitivity
+
 > *Maverick*: You don't have time to think up there. If you think, you're dead.
 
-And there's no clearer difference to me. I've had incidents in the past that I
-could have fixed immediately, but where I instead took 5 minutes to fetch a
-coworker, and show them the process of debugging and fixing the issue.
+And there's no clearer difference between the two roles to me. I've had
+incidents in the past that I could have fixed immediately, but where I instead
+took 5 minutes to fetch a coworker, and show them the process of debugging and
+fixing the issue. We have that luxury in computing. An incident will usually
+take at least 15 minutes to handle, so we can always take the few seconds to
+grab a pair, to document our process, and to double check our thinking.
+
+> *Officer*: It'll take ten minutes.
+> *Stinger*: Bullshit ten minutes! This thing will be over in two minutes! Get on it!
 
 Humans have a tendency to panic, and an incident is not a situation where panic
 is constructive. 'No one dies' is my mantra to keep panic from being a factor in
 my incidents.
+
+### On competiton
+
+> *Iceman*: The plaque for alternates is down in the ladies room
+
+The Top Gun academy is set up to be based around a competition. Each pair that
+comes in earns points as they fly sorties against the instructors, and those
+points add up to determine their ranking at the end of the course. This is a
+horrible way to run a software engineering team.
+
+The idea of a null sum game is easy to induce in people. Top Gun does it by
+stating that 'there are no prizes for second place'. This causes the trainees to
+fly like asses, producing suboptimal results. The two most notable examples of
+this are 1) when Maverick abandons his wingman, Iceman, to persue a target
+alone. They both fail to achive their goals. And 2) when Iceman refuses to move
+to give Maverick a shot, which indirectly causes an accident, and Goose's death.
+These incidents are a fault not in the characters, but in the design of Top
+Gun's incentive system.
+
+

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>A worked example of monitoring a queue based application - generic test domain</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="keywords" content="">
+  <link rel="canonical" href="http://generictestdomain.net/post/monitoring-queue/">
+
+  
+  
+
+  
+  
+
+  
+  
+
+  <link rel="stylesheet" type="text/css" href="http://generictestdomain.net//css/combined-min.css">
+
+</head>
+<body class="">
+
+<div class="site-wrap">
+  <header class="site-header px2 px-responsive">
+  <div class="mt2 wrap">
+    <div class="measure">
+      <a href="http://generictestdomain.net/" class="site-title">generic test domain</a>
+      <nav class="site-nav right">
+      <a href="/about/">About</a>
+<a href="/tags">Tags</a>
+<a href="/contact/">Contact</a>
+
+</form>
+
+      </nav>
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</header>
+
+  <div class="post p2 p-responsive wrap" role="main">
+    <div class="measure">
+      <div class="post-header mb2">
+        <h1 class="py2">A worked example of monitoring a queue based application</h1>
+        <span class="post-meta">Apr 1, 2017 by Laurie Clark-Michalek</span><br>
+        
+      </div>
+
+      <article class="post-content">
+      
+
+<h1 id="stash-deferred">Stash Deferred</h1>
+
+<p>At Qubit, we have a service named &lsquo;Stash Deferred&rsquo;. It reads from a database,
+<a href="https://cloud.google.com/bigtable/">GCP&rsquo;s Cloud Bigtable</a>, and writes to
+<a href="https://aws.amazon.com/kinesis/streams/">AWS&rsquo;s Kinesis</a>. Recently it underwent
+a bit of a renovation by the team that I am on, and a colleague commented that
+the end result had quite good monitoring, potentially worth of being a case
+study. Anyway, so here&rsquo;s that.</p>
+
+<p>Stash Deferred is a system for deferring message writes. A user sends, via a
+HTTP call, a message, and an expiry timestamp. When the expiry time is reached,
+the message is put onto the Kinesis queue. There is no guarentee of ordering
+given.</p>
+
+<p>Bigtable is a key value store that supports &lsquo;get&rsquo;, &lsquo;set&rsquo;, &lsquo;delete&rsquo; and &lsquo;scan&rsquo;.
+Scan allows you to request values between two keys, in lexographical
+(alphabetical) order. This is the operation that Stash Deferred uses to fetch
+messages that should be sent. Every interval we send a request for all of the
+values with keys between &lsquo;deferred:&rsquo; and &lsquo;deferred:<current unix timestamp>&rsquo;.
+These are the messages have &lsquo;expired&rsquo;, and should be put onto the kinesis queue.</p>
+
+<p>So, fairly simple. We read rows from Bigtable, publish their contents to
+Kinesis, then delete them from Bigtable. This look something like this:</p>
+
+<p><img src="/imgs/stash-deferred/simple.png" alt="Simple arch diagram" /></p>
+
+<p>The internal arrows here are unbuffered Go channels. We use them as we perform
+the operations at different rates; scans happen in large batches, publishes are
+unbatched, and deletes use small batches.</p>
+
+<h1 id="basic-monitoring">Basic Monitoring</h1>
+
+<p>There are three main operations here that we want to monitor; scan, publish, and
+delete. For each of these operations (and basically any operation in any
+application) there are two properties we can easily instrument: duration and
+count. I&rsquo;ll use the Kinesis publisher as my example for this. We define two
+metrics:</p>
+
+<pre><code>var (
+	kinesisWriteCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: &quot;stashdef_kinesis_message_write_total&quot;,
+			Help: &quot;count of kinesis messages written, tagged by result&quot;,
+		},
+		[]string{&quot;result&quot;},
+	)
+	kinesisWriteDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    &quot;stashdef_kinesis_message_write_duration_seconds&quot;,
+			Help:    &quot;duration of kinesis write operations&quot;,
+			Buckets: prometheus.ExponentialBuckets(0.1, 3, 6),
+		},
+	)
+)
+</code></pre>
+
+<p>If you&rsquo;ve never seen Prometheus metrics before, then I&rsquo;ll give you a brief
+explanation of what I&rsquo;m declaring here.</p>
+
+<p>The first metric is the variable <code>kinesisWriteCount</code>, which is registered as
+<code>stashdef_kinesis_message_write_total</code> on the Prometheus server. This might seem
+like a crazy long name, but there is a certain logic to it. Prometheus metrics
+follow the naming convention of <code>&lt;namespace&gt;_&lt;metric name&gt;_&lt;units&gt;</code>. In this
+case, our namespace is the abbreviated name of our program, <code>stashdef</code>. The name
+of the metric is always a little contentious, but <code>kinesis_message_write</code> is an
+understandable description of the operation we&rsquo;re monitoring. The unit is even
+less clear, using <code>total</code>. There is debate wether <code>total</code> or <code>count</code> is clearer
+to use when you&rsquo;re counting something, but I use <code>total</code>, as <code>count</code> is often
+used by the default Prometheus libraries, and my use is not always compatible
+with their use.</p>
+
+<p>The other thing to note about this metric is that we have a label on it.
+Prometheus allows you to add labels to your metrics, adding additional
+dimentions. In Qubit, we have a convention of having a label called result,
+which has two values: <code>success</code> and <code>failure</code>.</p>
+
+<p>The second metric is the variable <code>kinesisWriteDuration</code>, registered as
+<code>stashdef_kinesis_message_write_duration_seconds</code>. Much the same as the above,
+the key differences are that this is a histogram. A histogram is made up of a
+number of counters, each representing a different bucket. Here I set up a set of
+exponetially distributed buckets, with 0.1 being my starting bucket, 3 being my
+exponent, and 6 being the number of buckets. This results in buckets counting
+requests [0,0.1), [0.1,0.3), [0.3,0.9), etc etc.</p>
+
+<p>The other change is in the name of the metric, where we exchange <code>total</code> for
+<code>duration_seconds</code>. Adding the unit to the metric name makes life easier for
+everyone involved, and seconds is preferred for durations, given its SI status.
+All Prometheus metrics are 64 bit floating point numbers, so the number of cases
+where using seconds as a unit could cause issues is neglible.</p>
+
+<p>With our metric set up, we can now instrument our publishing code.</p>
+
+<pre><code>func (k *KinesisWriter) Write(ctx context.Context, messageChan &lt;-chan Message, delchan chan&lt;- string) error {
+	for {
+		var msg Message
+		select {
+		case &lt;-ctx.Done():
+			return ctx.Err()
+		case msg = &lt;-messageChan:
+		}
+
+		started := time.Now()
+		err := k.publish(msg)
+		if err != nil {
+			log.Warningf(&quot;could not publish message: %v&quot;, err)
+			kinesisWriteCount.WithLabelValues(&quot;failure&quot;).Inc()
+		} else {
+			kinesisWriteCount.WithLabelValues(&quot;success&quot;).Inc()
+		}
+		kinesisWriteDuration.Observe(float64(time.Since(started)) / float64(time.Second))
+
+		select {
+		case &lt;-ctx.Done():
+			return ctx.Err()
+		case delchan &lt;- msg.AckId:
+		}
+	}
+}
+</code></pre>
+
+<p>Gripping stuff. I&rsquo;ve omitted some code that handles retries and suchlike. With
+this, we get some incredibly useful metrics. Let&rsquo;s play with them.</p>
+
+<p>The first thing I&rsquo;d like to see is the throughput of my system. This is the rate
+of increase of the write count metric:</p>
+
+<pre><code>rate(stashdef_kinesis_message_write_total[1m])
+</code></pre>
+
+<p>As our metric is not a continuous function, we can&rsquo;t simply differentiate it, so
+we need to specify over what period we want our rate to be calculated. This is
+the period in the square brackets. 1m is a convention within Qubit, along with
+30m for when you want a calmer view. In general, the smaller the window, the
+less data required, the faster the result.</p>
+
+<p>When we graph this in the Prometheus UI, we get</p>
+
+<p><img src="/imgs/stash-deferred/rate-kinesis-write-total.png" alt="kinesis message write rate" /></p>
+
+<p>What we see here is that Prometheus has calculated the rate for each set of
+labels we have sent. In the graph&rsquo;s legend, we can see the set of labels that
+Prometheus has associated with our metrics. Many of them are generated by
+Prometheus based on the metadata attached to our application&rsquo;s deployment, but
+on the far right we can see the <code>result</code> metric. If we had more that one
+instance of the application running, we would end up with more than 2 lines. To
+merge those lines together, we need to specify an aggregation method. In this
+case, as we are interested in the throughput of the system, we probably want to
+sum all the lines together, to get the number of messages we are handling per
+second:</p>
+
+<pre><code>sum(rate(stashdef_kinesis_message_write_total[1m]))
+</code></pre>
+
+<p><img src="/imgs/stash-deferred/sum-rate-kinesis-write-total.png" alt="sum_kinesis message write rate" /></p>
+
+<p>Realistically, the information we want on our Grafana dashboard is probably the
+overall success and error rates. We can do this by summing over a specific
+label. This is similar to the <code>GROUP BY</code> statement in SQL:</p>
+
+<pre><code>sum(rate(stashdef_kinesis_message_write_total[1m])) by (result)
+</code></pre>
+
+<p>Putting that on our dashboard, we get</p>
+
+<p><img src="/imgs/stash-deferred/sum-rate-kinesis-write-result.png" alt="sum-rate-kinesis-write-result" /></p>
+
+<p>Beautiful. Let&rsquo;s take a look at our duration metrics next.</p>
+
+      </article>
+
+      <p class="post-meta">Tags:&nbsp;
+        
+            
+            <a href="http://generictestdomain.net//tags/software%20engineering">software engineering</a>
+        
+            ,&nbsp;
+            <a href="http://generictestdomain.net//tags/monitoring">monitoring</a>
+        
+            ,&nbsp;
+            <a href="http://generictestdomain.net//tags/prometheus">prometheus</a>
+        
+      </p>
+
+      
+
+    </div>
+  </div>
+</div>
+    <footer class="footer">
+      <div class="p2 wrap">
+        <div class="measure mt1 center">
+      <nav class="social-icons icons">
+<a class="fa fa-rss rss" href="/index.xml"></a>
+
+</nav>
+
+          <small>
+            Copyright &#169; 2017<br>
+            Powered by <a href="http://gohugo.io/" target="_blank">Hugo</a> &amp; <a href="https://github.com/azmelanar/hugo-theme-pixyll" target="_blank">Pixyll</a>
+          </small>
+        </div>
+      </div>
+    </footer>
+
+    
+    <script src="/js/highlight.pack.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    
+    
+
+
+</body>
+</html>
+

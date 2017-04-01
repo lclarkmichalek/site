@@ -7,7 +7,17 @@
     <language>en-gb</language>
     
     
-    <updated>Sun, 26 Mar 2017 21:35:50 BST</updated>
+    <updated>Sat, 01 Apr 2017 21:13:56 BST</updated>
+    
+    <item>
+      <title>A worked example of monitoring a queue based application</title>
+      <link>http://generictestdomain.net/post/monitoring-queue/</link>
+      <pubDate>Sat, 01 Apr 2017 21:13:56 BST</pubDate>
+      
+      <guid>http://generictestdomain.net/post/monitoring-queue/</guid>
+      <description>Stash Deferred At Qubit, we have a service named &amp;lsquo;Stash Deferred&amp;rsquo;. It reads from a database, GCP&amp;rsquo;s Cloud Bigtable, and writes to AWS&amp;rsquo;s Kinesis. Recently it underwent a bit of a renovation by the team that I am on, and a colleague commented that the end result had quite good monitoring, potentially worth of being a case study. Anyway, so here&amp;rsquo;s that.
+Stash Deferred is a system for deferring message writes.</description>
+    </item>
     
     <item>
       <title>The applications of Top Gun to software engineering</title>

@@ -257,7 +257,8 @@ form of useful result.</p>
 <h2 id="slightly-interesting-monitoring">Slightly interesting monitoring</h2>
 
 <p>Is there anything more we need to measure about our program? There are a few
-things that this program does that verge on interesting.</p>
+things that this program does that verge on interesting, and we should probably
+get some visibility on.</p>
 
 <p>When we read from Bigtable, there is a chance that the row we read is one that
 we have read previously, and is currently in the process of being written to
@@ -359,7 +360,7 @@ bit is super boring, as you&rsquo;re just matching up labels to metrics.</p>
 <li>It&rsquo;ll look ugly. I know. I&rsquo;m sorry.</li>
 <li>I wish I could use dot syntax, but the fact that Mermaid is so limiting but
 the plugin is still so useful speaks to the power of diagrams.</li>
-<li>Use shapes to classify components. I use rectangles for datastores, rouned
+<li>Use shapes to classify components. I use rectangles for datastores, rounded
 rectangles for processes, and the wierd asymetric shape for resulting states.</li>
 <li>Avoid squares, circles and rhombuses. Their volume increases at the square of
 the length of any text inside them. This means that a square <code>Duplicate</code>
@@ -384,7 +385,8 @@ sending something new&rsquo;? We can add a metric to capture this.</p>
 )
 </code></pre>
 
-<p>This metric has the tag <code>stream</code>, which contains the name of each stream.</p>
+<p>This metric has the tag <code>stream</code>, which contains the name of the Kinesis stream
+we are publishing the messages to.</p>
 
 <p>Now, there are issues with this, the primary being that the values of <code>stream</code>
 are unbounded. Prometheus scales primarily with the number of metrics, and each
@@ -403,6 +405,128 @@ aggregation</a>.</p>
 <p>I&rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the readded it. It&rsquo;s probably worth
 having, but looking at it for too long will turn it into a vanity metric.</p>
+
+<h3 id="backpressure">Backpressure</h3>
+
+<p>When the system reaches saturation, the limiting factor is the Bigtable scanner.
+However, it&rsquo;s perfectly possible that the Kinesis publisher could become very
+slow, or that the Bigtable deleter could slow down. As the channels between the
+components are unbuffered, a slowdown upstream should cause the send on the
+channel to slow down, and by measuring this, we can get a sense of it there is a
+non scanner slowdown. Implementing this is easy enough.</p>
+
+<pre><code>var (
+	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    &quot;stashdef_bigtable_row_scan_backpressure_seconds&quot;,
+		Help:    &quot;Backpressure on the channel out of the row scan&quot;,
+		Buckets: prometheus.ExponentialBuckets(0.001, 3, 6),
+	})
+)
+
+func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&lt;- Message) error {
+...
+	sendStarted := time.Now()
+	select {
+	case &lt;-ctx.Done():
+		return ctx.Err()
+	case messageChan &lt;- msg:
+	}
+	bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
+...
+}
+</code></pre>
+
+<p>This metric is almost always incredibly low, as a channel send is very fast when
+there is a listener on the other end. However, as soon as there is a delay
+upstream, this metric becomes very important.</p>
+
+<p>Plotting this in Grafana, I take the same approach as our other duration based
+metrics, using quantiles at 50%, 90%, and 99%.</p>
+
+<p><img src="/imgs/stash-deferred/backpressure.png" alt="backpressure" /></p>
+
+<p>The use of a log scale here makes it easier to handle the massive difference
+between an unhindered send, which is under 1ms, and a hindered send, which can
+be in the 100s of milliseconds.</p>
+
+<h2 id="pagable-metrics">Pagable metrics</h2>
+
+<p>I wouldn&rsquo;t page on any of the metrics we&rsquo;ve collected so far. The key property
+for an alert being pagable is user impact, and everything we&rsquo;ve talked is very
+much a cause, not a symptom. To work out what we want to page on, we need to
+think about what happens when our system fails, and what do our users
+experience. In this case, there are two main symptoms; message lag and message
+drops.</p>
+
+<p>To measure these, we have a completely seperate application. This application (I
+call it <code>lag-monitor</code>) periodically sends messages with very short expiry, and
+then listens to the destination queue to see how long it takes before a message
+comes through. This exposes two main metrics</p>
+
+<pre><code>const (
+	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: &quot;stashdef_lag_seconds&quot;,
+		Help: &quot;The last Stash deferred lag&quot;,
+	})
+	stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: &quot;stashdef_last_received_timestamp_seconds&quot;,
+		Help: &quot;The timestamp when we last received a message from Stash deferred&quot;,
+	})
+)
+</code></pre>
+
+<p>The current lag can then be calculated as the time since we got a message, plus
+the lag on that message. This looks like</p>
+
+<pre><code>(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+</code></pre>
+
+<p><img src="/imgs/stash-deferred/stash-lag.png" alt="stash-lag" /></p>
+
+<p>The spikey nature of this graph comes from our use of Prometheus&rsquo;s
+<a href="https://prometheus.io/docs/querying/functions/#time()"><code>time</code> function</a>,
+which steadily inreases, while the last received metric resets every time we get
+a message.</p>
+
+<p>This is the metric I want to alert on. Let&rsquo;s write a Prometheus alert on this</p>
+
+<pre><code>job:stashdef_lag:seconds = (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+ALERT StashDeferredLagHigh
+  IF job:stashdef_lag:seconds &gt; 5 * 60
+  FOR 2m
+  LABELS {slack_channel=&quot;stash-deferred&quot;}
+  ANNOTATIONS {description=&quot;Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)&quot;}
+</code></pre>
+
+<p>Here we set up a <a href="https://prometheus.io/docs/querying/rules/">recording rule</a> to
+continuously calculate and store our lag. We then create an alert on this,
+configured to send to a slack channel, along with a description. This is
+specific to our Prometheus setup at Qubit, but is super useful.</p>
+
+<p>As an aside, recording rules are a great idea, and in general if you want a
+dashboard to load quickly, I&rsquo;d recommend implementing your queries as recording
+rules.</p>
+
+<h1 id="putting-it-together">Putting it together</h1>
+
+<p>Our final dashboard looks like&hellip;</p>
+
+<p><img src="/imgs/stash-deferred/all.png" alt="all" /></p>
+
+<p>The additions made here are:</p>
+
+<ol>
+<li>The Bigtable deletion rate graph. Failed Bigtable deletions can result in
+duplicate messages, so we prioritise this metric.</li>
+<li>Component memory usage. This is a metric fetched from the Kubernetes cluster,
+and is mostly there so I can say &lsquo;look how efficient it is!&rsquo;</li>
+</ol>
+
+<p>In the future, as I gain more experience operating this service, I plan to
+demote some of the duration metrics to below the fold on this dashboard, as they
+seem to be subject to seemingly alarming changes under completely normal
+operation. I also hope to spend some time addressing dropped messages in a more
+holistic manner in the lag monitor component.</p>
 
       </article>
 

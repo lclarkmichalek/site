@@ -218,7 +218,8 @@ form of useful result.
 ## Slightly interesting monitoring
 
 Is there anything more we need to measure about our program? There are a few
-things that this program does that verge on interesting.
+things that this program does that verge on interesting, and we should probably
+get some visibility on.
 
 When we read from Bigtable, there is a chance that the row we read is one that
 we have read previously, and is currently in the process of being written to
@@ -321,7 +322,7 @@ General notes on the diagram plugin:
 1. It'll look ugly. I know. I'm sorry.
 2. I wish I could use dot syntax, but the fact that Mermaid is so limiting but
    the plugin is still so useful speaks to the power of diagrams.
-3. Use shapes to classify components. I use rectangles for datastores, rouned
+3. Use shapes to classify components. I use rectangles for datastores, rounded
    rectangles for processes, and the wierd asymetric shape for resulting states.
 4. Avoid squares, circles and rhombuses. Their volume increases at the square of
    the length of any text inside them. This means that a square `Duplicate`
@@ -346,7 +347,8 @@ var (
 )
 ```
 
-This metric has the tag `stream`, which contains the name of each stream.
+This metric has the tag `stream`, which contains the name of the Kinesis stream
+we are publishing the messages to.
 
 Now, there are issues with this, the primary being that the values of `stream`
 are unbounded. Prometheus scales primarily with the number of metrics, and each
@@ -367,4 +369,63 @@ I'm never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the readded it. It's probably worth
 having, but looking at it for too long will turn it into a vanity metric.
 
+## Pagable metrics
 
+I wouldn't page on any of the metrics we've collected so far. The key property
+for an alert being pagable is user impact, and everything we've talked is very
+much a cause, not a symptom. To work out what we want to page on, we need to
+think about what happens when our system fails, and what do our users
+experience. In this case, there are two main symptoms; message lag and message
+drops.
+
+To measure these, we have a completely seperate application. This application (I
+call it `lag-monitor`) periodically sends messages with very short expiry, and
+then listens to the destination queue to see how long it takes before a message
+comes through. This exposes two main metrics
+
+```
+const (
+	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "stashdef_lag_seconds",
+		Help: "The last Stash deferred lag",
+	})
+	stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "stashdef_last_received_timestamp_seconds",
+		Help: "The timestamp when we last received a message from Stash deferred",
+	})
+)
+```
+
+The current lag can then be calculated as the time since we got a message, plus
+the lag on that message. This looks like
+
+```
+(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+```
+
+![stash-lag](/imgs/stash-deferred/stash-lag.png)
+
+The spikey nature of this graph comes from our use of Prometheus's
+[`time` function](https://prometheus.io/docs/querying/functions/#time\(\)),
+which steadily inreases, while the last received metric resets every time we get
+a message.
+
+This is the metric I want to alert on. Let's write a Prometheus alert on this
+
+```
+job:stashdef_lag:seconds = (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+ALERT StashDeferredLagHigh
+  IF job:stashdef_lag:seconds > 5 * 60
+  FOR 5m
+  LABELS {slack_channel="stash-deferred"}
+  ANNOTATIONS {description="Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)"}
+```
+
+Here we set up a [recording rule](https://prometheus.io/docs/querying/rules/) to
+continuously calculate and store our lag. We then create an alert on this,
+configured to send to a slack channel, along with a description. This is
+specific to our Prometheus setup at Qubit, but is super useful.
+
+As an aside, recording rules are a great idea, and in general if you want a
+dashboard to load quickly, I'd recommend implementing your queries as recording
+rules.

@@ -369,6 +369,50 @@ I'm never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the readded it. It's probably worth
 having, but looking at it for too long will turn it into a vanity metric.
 
+### Backpressure
+
+When the system reaches saturation, the limiting factor is the Bigtable scanner.
+However, it's perfectly possible that the Kinesis publisher could become very
+slow, or that the Bigtable deleter could slow down. As the channels between the
+components are unbuffered, a slowdown upstream should cause the send on the
+channel to slow down, and by measuring this, we can get a sense of it there is a
+non scanner slowdown. Implementing this is easy enough.
+
+```
+var (
+	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "stashdef_bigtable_row_scan_backpressure_seconds",
+		Help:    "Backpressure on the channel out of the row scan",
+		Buckets: prometheus.ExponentialBuckets(0.001, 3, 6),
+	})
+)
+
+func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan<- Message) error {
+...
+	sendStarted := time.Now()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case messageChan <- msg:
+	}
+	bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
+...
+}
+```
+
+This metric is almost always incredibly low, as a channel send is very fast when
+there is a listener on the other end. However, as soon as there is a delay
+upstream, this metric becomes very important.
+
+Plotting this in Grafana, I take the same approach as our other duration based
+metrics, using quantiles at 50%, 90%, and 99%.
+
+![backpressure](/imgs/stash-deferred/backpressure.png)
+
+The use of a log scale here makes it easier to handle the massive difference
+between an unhindered send, which is under 1ms, and a hindered send, which can
+be in the 100s of milliseconds.
+
 ## Pagable metrics
 
 I wouldn't page on any of the metrics we've collected so far. The key property
@@ -416,7 +460,7 @@ This is the metric I want to alert on. Let's write a Prometheus alert on this
 job:stashdef_lag:seconds = (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 ALERT StashDeferredLagHigh
   IF job:stashdef_lag:seconds > 5 * 60
-  FOR 5m
+  FOR 2m
   LABELS {slack_channel="stash-deferred"}
   ANNOTATIONS {description="Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)"}
 ```
@@ -429,3 +473,22 @@ specific to our Prometheus setup at Qubit, but is super useful.
 As an aside, recording rules are a great idea, and in general if you want a
 dashboard to load quickly, I'd recommend implementing your queries as recording
 rules.
+
+# Putting it together
+
+Our final dashboard looks like...
+
+![all](/imgs/stash-deferred/all.png)
+
+The additions made here are:
+
+1. The Bigtable deletion rate graph. Failed Bigtable deletions can result in
+   duplicate messages, so we prioritise this metric.
+2. Component memory usage. This is a metric fetched from the Kubernetes cluster,
+   and is mostly there so I can say 'look how efficient it is!'
+
+In the future, as I gain more experience operating this service, I plan to
+demote some of the duration metrics to below the fold on this dashboard, as they
+seem to be subject to seemingly alarming changes under completely normal
+operation. I also hope to spend some time addressing dropped messages in a more
+holistic manner in the lag monitor component.

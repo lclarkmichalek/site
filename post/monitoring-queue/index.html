@@ -219,7 +219,190 @@ label. This is similar to the <code>GROUP BY</code> statement in SQL:</p>
 
 <p><img src="/imgs/stash-deferred/sum-rate-kinesis-write-result.png" alt="sum-rate-kinesis-write-result" /></p>
 
-<p>Beautiful. Let&rsquo;s take a look at our duration metrics next.</p>
+<p>Beautiful. No errors! Let&rsquo;s take a look at our duration metrics next.</p>
+
+<p>With duration, we have no choice but to show a statistic, as a time series of
+a histogram is not particularly possible when we only have two dimensions. An
+easy to calculate statistic is the mean time the publish operation takes.</p>
+
+<pre><code>rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
+  rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
+</code></pre>
+
+<p>However the mean is a widely discredited statistic in monitoring circles. Much
+preferred is the quantile. Prometheus allows us to calculate quantiles from
+histograms using the <a href="https://prometheus.io/docs/querying/functions/#histogram_quantile"><code>histogram_quantile</code>
+function</a>.</p>
+
+<pre><code>histogram_quantile(0.99,
+  rate(stashdef_kinesis_message_write_duration_seconds_bucket[1m]))
+</code></pre>
+
+<p><img src="/imgs/stash-deferred/q99-rate-kinesis-write-duration.png" alt="sum-rate-kinesis-write-result" /></p>
+
+<p>Here we can see that our 99%th percentile publish duration is usually 300ms,
+jumping up to 700ms occasionally. One great thing about Prometheus is that there
+is rarely any confusion over the units, as functions do not as a rule change
+units between input and output.</p>
+
+<p>Let&rsquo;s put this quantile, along with 50% and 90%, on our Grafana and admire the
+result.</p>
+
+<p><img src="/imgs/stash-deferred/quantiles-rate-kinesis-write-duration.png" alt="sum-rate-kinesis-write-result" /></p>
+
+<p>And now repeat for the other two operations. We now have basic instrumentation
+that we could apply to pretty much any operation in any program, and get some
+form of useful result.</p>
+
+<h2 id="slightly-interesting-monitoring">Slightly interesting monitoring</h2>
+
+<p>Is there anything more we need to measure about our program? There are a few
+things that this program does that verge on interesting.</p>
+
+<p>When we read from Bigtable, there is a chance that the row we read is one that
+we have read previously, and is currently in the process of being written to
+Kinesis or deleted from Bigtable. To combat this, we maintain a list of active
+records, and do not send rows to be published if they are in the list of
+actives. This gives a rate of duplicates, which we might like to measure.</p>
+
+<pre><code>var (
+	bigtableScanDuplicateCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: &quot;stashdef_duplicates_filtered_total&quot;,
+			Help: &quot;Count of duplicate messages filtered on scan&quot;,
+		},
+	)
+)
+
+func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&lt;- Message) error {
+...
+	if b.IsActive(msg) {
+		bigtableScanDuplicateCount.Inc()
+	} else {
+		select {
+		case &lt;-ctx.Done():
+			return ctx.Err()
+		case messageChan &lt;- msg:
+		}
+	}
+...
+}
+</code></pre>
+
+<p>This metric isn&rsquo;t particularly interesting, but duplication is one of the states
+that a row finish in, so having visibility of it is useful. I doubt I&rsquo;d ever
+alert on it, but I might graph it during an incident to see if anything funky
+was going on.</p>
+
+<h3 id="building-a-diagram">Building a diagram</h3>
+
+<p>With that metric, we now have visibility on every exit point of a row from our
+application. At Qubit we have a third party plugin installed in our Grafana,
+<a href="https://grafana.qutics.com/plugins/jdbranham-diagram-panel/edit">jdbranham&rsquo;s diagram
+plugin</a>. It
+lets you create diagrams using <a href="https://knsv.github.io/mermaid/">Mermaid</a>
+syntax, and then annotate them and style them based on the value of metrics.
+This allows you to produce something like this.</p>
+
+<p><img src="/imgs/stash-deferred/diagram-rate1m.png" alt="diagram-rate1m" /></p>
+
+<p>This gives us an overview of how the system works, which is incredibly useful
+all on its own, and a quick look at the rates going through each component.</p>
+
+<p>The value here isn&rsquo;t in the quality of the data, as obviously a chart showing us
+these values over time would give us a much better dataset with which to judge
+things on. The value is the ability for anyone in the company to come to
+the Grafana page and see at a glance the components that make up the system.</p>
+
+<p>Dashboards aren&rsquo;t just about showing data. They also need to be interpretable by
+people, preferable including the people who didn&rsquo;t create the dashboard. This is
+why giving plots titles, units, and even descriptions makes the difference
+between some metrics on a page and an actual dashboard. The diagram is just
+another tool in that direction.</p>
+
+<p>The diagram plugin takes two main set of inputs. The first is the Mermaid
+specification for the diagram, and the second is the mapping from node on the
+diagram to metric.</p>
+
+<p>The Mermaid specification for the above graph is provided below. It&rsquo;s pretty
+incomprehensible, and the only way you&rsquo;ll get any value out of this section is
+by installing the diagram plugin and trying out it out.</p>
+
+<pre><code>graph LR
+subgraph stash
+W[User] ==&gt; S
+end
+
+S(Stash) ==&gt; A[BigTable]
+
+subgraph deferred-backend
+A ==&gt; B(BT Scaner)
+B --&gt; B1&gt;Duplicate]
+B --&gt; B2&gt;Error]
+B ==&gt; C(Kinesis Publisher)
+C --&gt; C1&gt;Error]
+C ==&gt; D(BT Deleter)
+D ==&gt; A
+D --&gt; D1&gt;Error]
+end
+C ==&gt; E[Kinesis]
+</code></pre>
+
+<p>Each of the names of the nodes (<code>A</code>, <code>B</code>, etc) needs a metric to go along with
+it. I really recommend using the same units for every metric in the diagram.
+I&rsquo;ve gone with <code>sum(rate(&lt;metric&gt;[1m]))</code>, and I explain that in the title. This
+bit is super boring, as you&rsquo;re just matching up labels to metrics.</p>
+
+<p>General notes on the diagram plugin:</p>
+
+<ol>
+<li>It&rsquo;ll look ugly. I know. I&rsquo;m sorry.</li>
+<li>I wish I could use dot syntax, but the fact that Mermaid is so limiting but
+the plugin is still so useful speaks to the power of diagrams.</li>
+<li>Use shapes to classify components. I use rectangles for datastores, rouned
+rectangles for processes, and the wierd asymetric shape for resulting states.</li>
+<li>Avoid squares, circles and rhombuses. Their volume increases at the square of
+the length of any text inside them. This means that a square <code>Duplicate</code>
+would be much bigger than a square <code>Error</code>, suggesting to the user there are
+more duplicates happening than errors.</li>
+</ol>
+
+<h3 id="top-users">Top users</h3>
+
+<p>Nothing we&rsquo;ve done so far introspects the data coming through our system. One
+common question during an incident relating to volume is &lsquo;did someone start
+sending something new&rsquo;? We can add a metric to capture this.</p>
+
+<pre><code>var (
+	kinesisDecodeCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: &quot;stashdef_kinesis_message_decode_total&quot;,
+			Help: &quot;count of kinesis messages written, tagged by stream name&quot;,
+		},
+		[]string{&quot;stream&quot;},
+	)
+)
+</code></pre>
+
+<p>This metric has the tag <code>stream</code>, which contains the name of each stream.</p>
+
+<p>Now, there are issues with this, the primary being that the values of <code>stream</code>
+are unbounded. Prometheus scales primarily with the number of metrics, and each
+new value of <code>stream</code> creates a new metrics. However, in our situation, we are
+only creating a single metric per <code>stream</code> value, and the value of being able to
+see different stream names is greater than the risks involved. When we graph
+this, we probably only care about the top few streams. For this, we can use
+Prometheus&rsquo;s <a href="https://prometheus.io/docs/querying/operators/#aggregation-operators"><code>topk</code>
+aggregation</a>.</p>
+
+<pre><code>topk(4, sum(rate(stashdef_kinesis_message_decode_total[1m]) by (stream))
+</code></pre>
+
+<p><img src="/imgs/stash-deferred/topk-streams.png" alt="topk-streams" /></p>
+
+<p>I&rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
+displayed this metric, then removed it, and the readded it. It&rsquo;s probably worth
+having, but looking at it for too long will turn it into a vanity metric.</p>
 
       </article>
 

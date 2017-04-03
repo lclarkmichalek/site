@@ -3,3 +3,5 @@ title = "generic test domain"
 baseURL = "http://generictestdomain.net/"
 
 publishDir = "."
+
+googleAnalytics = "UA-25243984-2"

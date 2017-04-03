@@ -457,12 +457,18 @@ a message.
 This is the metric I want to alert on. Let's write a Prometheus alert on this
 
 ```
-job:stashdef_lag:seconds = (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+job:stashdef_lag:seconds =
+  (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+
 ALERT StashDeferredLagHigh
   IF job:stashdef_lag:seconds > 5 * 60
   FOR 2m
-  LABELS {slack_channel="stash-deferred"}
-  ANNOTATIONS {description="Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)"}
+  LABELS {
+    slack_channel="stash-deferred"
+  }
+  ANNOTATIONS {
+    description="Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)"
+  }
 ```
 
 Here we set up a [recording rule](https://prometheus.io/docs/querying/rules/) to

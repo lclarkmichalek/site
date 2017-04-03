@@ -64,15 +64,15 @@ study. Anyway, so here&rsquo;s that.</p>
 
 <p>Stash Deferred is a system for deferring message writes. A user sends, via a
 HTTP call, a message, and an expiry timestamp. When the expiry time is reached,
-the message is put onto the Kinesis queue. There is no guarentee of ordering
+the message is put onto the Kinesis queue. There is no guarantee of ordering
 given.</p>
 
 <p>Bigtable is a key value store that supports &lsquo;get&rsquo;, &lsquo;set&rsquo;, &lsquo;delete&rsquo; and &lsquo;scan&rsquo;.
-Scan allows you to request values between two keys, in lexographical
+Scan allows you to request values between two keys, in lexicographical
 (alphabetical) order. This is the operation that Stash Deferred uses to fetch
 messages that should be sent. Every interval we send a request for all of the
 values with keys between &lsquo;deferred:&rsquo; and &lsquo;deferred:<current unix timestamp>&rsquo;.
-These are the messages have &lsquo;expired&rsquo;, and should be put onto the kinesis queue.</p>
+These are the messages have &lsquo;expired&rsquo;, and should be put onto the Kinesis queue.</p>
 
 <p>So, fairly simple. We read rows from Bigtable, publish their contents to
 Kinesis, then delete them from Bigtable. This look something like this:</p>
@@ -119,21 +119,21 @@ follow the naming convention of <code>&lt;namespace&gt;_&lt;metric name&gt;_&lt;
 case, our namespace is the abbreviated name of our program, <code>stashdef</code>. The name
 of the metric is always a little contentious, but <code>kinesis_message_write</code> is an
 understandable description of the operation we&rsquo;re monitoring. The unit is even
-less clear, using <code>total</code>. There is debate wether <code>total</code> or <code>count</code> is clearer
+less clear, using <code>total</code>. There is debate whether <code>total</code> or <code>count</code> is clearer
 to use when you&rsquo;re counting something, but I use <code>total</code>, as <code>count</code> is often
 used by the default Prometheus libraries, and my use is not always compatible
 with their use.</p>
 
 <p>The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
-dimentions. In Qubit, we have a convention of having a label called result,
+dimensions. In Qubit, we have a convention of having a label called result,
 which has two values: <code>success</code> and <code>failure</code>.</p>
 
 <p>The second metric is the variable <code>kinesisWriteDuration</code>, registered as
 <code>stashdef_kinesis_message_write_duration_seconds</code>. Much the same as the above,
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
-exponetially distributed buckets, with 0.1 being my starting bucket, 3 being my
+exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
 exponent, and 6 being the number of buckets. This results in buckets counting
 requests [0,0.1), [0.1,0.3), [0.3,0.9), etc etc.</p>
 
@@ -141,7 +141,7 @@ requests [0,0.1), [0.1,0.3), [0.3,0.9), etc etc.</p>
 <code>duration_seconds</code>. Adding the unit to the metric name makes life easier for
 everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
-where using seconds as a unit could cause issues is neglible.</p>
+where using seconds as a unit could cause issues is negligible.</p>
 
 <p>With our metric set up, we can now instrument our publishing code.</p>
 
@@ -361,7 +361,7 @@ bit is super boring, as you&rsquo;re just matching up labels to metrics.</p>
 <li>I wish I could use dot syntax, but the fact that Mermaid is so limiting but
 the plugin is still so useful speaks to the power of diagrams.</li>
 <li>Use shapes to classify components. I use rectangles for datastores, rounded
-rectangles for processes, and the wierd asymetric shape for resulting states.</li>
+rectangles for processes, and the weird asymmetric shape for resulting states.</li>
 <li>Avoid squares, circles and rhombuses. Their volume increases at the square of
 the length of any text inside them. This means that a square <code>Duplicate</code>
 would be much bigger than a square <code>Error</code>, suggesting to the user there are
@@ -403,7 +403,7 @@ aggregation</a>.</p>
 <p><img src="/imgs/stash-deferred/topk-streams.png" alt="topk-streams" /></p>
 
 <p>I&rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
-displayed this metric, then removed it, and the readded it. It&rsquo;s probably worth
+displayed this metric, then removed it, and the re-added it. It&rsquo;s probably worth
 having, but looking at it for too long will turn it into a vanity metric.</p>
 
 <h3 id="backpressure">Backpressure</h3>
@@ -458,7 +458,7 @@ think about what happens when our system fails, and what do our users
 experience. In this case, there are two main symptoms; message lag and message
 drops.</p>
 
-<p>To measure these, we have a completely seperate application. This application (I
+<p>To measure these, we have a completely separate application. This application (I
 call it <code>lag-monitor</code>) periodically sends messages with very short expiry, and
 then listens to the destination queue to see how long it takes before a message
 comes through. This exposes two main metrics</p>
@@ -483,19 +483,25 @@ the lag on that message. This looks like</p>
 
 <p><img src="/imgs/stash-deferred/stash-lag.png" alt="stash-lag" /></p>
 
-<p>The spikey nature of this graph comes from our use of Prometheus&rsquo;s
+<p>The spiky nature of this graph comes from our use of Prometheus&rsquo;s
 <a href="https://prometheus.io/docs/querying/functions/#time()"><code>time</code> function</a>,
-which steadily inreases, while the last received metric resets every time we get
+which steadily increases, while the last received metric resets every time we get
 a message.</p>
 
 <p>This is the metric I want to alert on. Let&rsquo;s write a Prometheus alert on this</p>
 
-<pre><code>job:stashdef_lag:seconds = (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+<pre><code>job:stashdef_lag:seconds =
+  (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+
 ALERT StashDeferredLagHigh
   IF job:stashdef_lag:seconds &gt; 5 * 60
   FOR 2m
-  LABELS {slack_channel=&quot;stash-deferred&quot;}
-  ANNOTATIONS {description=&quot;Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)&quot;}
+  LABELS {
+    slack_channel=&quot;stash-deferred&quot;
+  }
+  ANNOTATIONS {
+    description=&quot;Stash deferred messages are arriving {{ $value }} seconds after they were scheduled (threshold 5m)&quot;
+  }
 </code></pre>
 
 <p>Here we set up a <a href="https://prometheus.io/docs/querying/rules/">recording rule</a> to

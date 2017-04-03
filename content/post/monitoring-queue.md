@@ -472,13 +472,25 @@ ALERT StashDeferredLagHigh
 ```
 
 Here we set up a [recording rule](https://prometheus.io/docs/querying/rules/) to
-continuously calculate and store our lag. We then create an alert on this,
-configured to send to a slack channel, along with a description. This is
-specific to our Prometheus setup at Qubit, but is super useful.
+continuously calculate and store our lag, along with an alert on that lag
+calculation.  The alert syntax is a wee bit odd, but should read: the alert
+`StashDeferredLagHigh` will fire if the metric `job:stashdef_lag:seconds` is
+greater than 300 for 2 minutes. When it fires, it should send to the slack
+channel `stash-deferred`, with the following description [description omitted].
 
-As an aside, recording rules are a great idea, and in general if you want a
-dashboard to load quickly, I'd recommend implementing your queries as recording
-rules.
+The durations specified in the alert above are a bit arbitrary, and will be
+subject to tweaks over time. With the current setup, we can say that should the
+process stop processing messages altogether, it will take 4 minutes before the
+metric is above 300 seconds (i.e. 5 minutes of lag), and then another 2 minutes
+before the alert will fire. This is perfectly acceptable for this system. Your
+system may have very different users who rely on a different guarentees.
+
+The Slack integration is set up in our
+[alertmanager](https://github.com/prometheus/alertmanager) config. I'd really
+recommend integrating with whatever chat system your organisation uses.
+Recording rules are also a great idea, and in general if you want
+a dashboard to load quickly, I'd recommend implementing the queries you are
+plotting as recording rules.
 
 # Putting it together
 

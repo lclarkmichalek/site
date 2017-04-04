@@ -14,7 +14,7 @@ At Qubit, we have a service named 'Stash Deferred'. It reads from a database,
 [AWS's Kinesis](https://aws.amazon.com/kinesis/streams/). Recently it underwent
 a bit of a renovation by the team that I am on, and a colleague commented that
 the end result had quite good monitoring, potentially worth of being a case
-study. Anyway, so here's that.
+study. So here's that.
 
 Stash Deferred is a system for deferring message writes. A user sends, via a
 HTTP call, a message, and an expiry timestamp. When the expiry time is reached,

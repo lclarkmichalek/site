@@ -45,7 +45,7 @@ application) there are two properties we can easily instrument: duration and
 count. I'll use the Kinesis publisher as my example for this. We define two
 metrics:
 
-```
+```go
 var (
 	kinesisWriteCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -100,7 +100,7 @@ where using seconds as a unit could cause issues is negligible.
 
 With our metric set up, we can now instrument our publishing code.
 
-```
+```go
 func (k *KinesisWriter) Write(ctx context.Context, messageChan <-chan Message, delchan chan<- string) error {
 	for {
 		var msg Message
@@ -135,7 +135,7 @@ this, we get some incredibly useful metrics. Let's play with them.
 The first thing I'd like to see is the throughput of my system. This is the rate
 of increase of the write count metric:
 
-```
+```rule
 rate(stashdef_kinesis_message_write_total[1m])
 ```
 
@@ -160,7 +160,7 @@ case, as we are interested in the throughput of the system, we probably want to
 sum all the lines together, to get the number of messages we are handling per
 second:
 
-```
+```rule
 sum(rate(stashdef_kinesis_message_write_total[1m]))
 ```
 
@@ -170,7 +170,7 @@ Realistically, the information we want on our Grafana dashboard is probably the
 overall success and error rates. We can do this by summing over a specific
 label. This is similar to the `GROUP BY` statement in SQL:
 
-```
+```rule
 sum(rate(stashdef_kinesis_message_write_total[1m])) by (result)
 ```
 
@@ -184,7 +184,7 @@ With duration, we have no choice but to show a statistic, as a time series of
 a histogram is not particularly possible when we only have two dimensions. An
 easy to calculate statistic is the mean time the publish operation takes.
 
-```
+```rule
 rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
   rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
 ```
@@ -194,7 +194,7 @@ preferred is the quantile. Prometheus allows us to calculate quantiles from
 histograms using the [`histogram_quantile`
 function](https://prometheus.io/docs/querying/functions/#histogram_quantile).
 
-```
+```rule
 histogram_quantile(0.99,
   rate(stashdef_kinesis_message_write_duration_seconds_bucket[1m]))
 ```
@@ -227,7 +227,7 @@ Kinesis or deleted from Bigtable. To combat this, we maintain a list of active
 records, and do not send rows to be published if they are in the list of
 actives. This gives a rate of duplicates, which we might like to measure.
 
-```
+```go
 var (
 	bigtableScanDuplicateCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -291,7 +291,7 @@ The Mermaid specification for the above graph is provided below. It's pretty
 incomprehensible, and the only way you'll get any value out of this section is
 by installing the diagram plugin and trying out it out.
 
-```
+```mermaid
 graph LR
 subgraph stash
 W[User] ==> S
@@ -335,7 +335,7 @@ Nothing we've done so far introspects the data coming through our system. One
 common question during an incident relating to volume is 'did someone start
 sending something new'? We can add a metric to capture this.
 
-```
+```go
 var (
 	kinesisDecodeCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -359,7 +359,7 @@ this, we probably only care about the top few streams. For this, we can use
 Prometheus's [`topk`
 aggregation](https://prometheus.io/docs/querying/operators/#aggregation-operators).
 
-```
+```rule
 topk(4, sum(rate(stashdef_kinesis_message_decode_total[1m]) by (stream))
 ```
 
@@ -378,7 +378,7 @@ components are unbuffered, a slowdown upstream should cause the send on the
 channel to slow down, and by measuring this, we can get a sense of it there is a
 non scanner slowdown. Implementing this is easy enough.
 
-```
+```go
 var (
 	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "stashdef_bigtable_row_scan_backpressure_seconds",
@@ -427,7 +427,7 @@ call it `lag-monitor`) periodically sends messages with very short expiry, and
 then listens to the destination queue to see how long it takes before a message
 comes through. This exposes two main metrics
 
-```
+```go
 const (
 	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "stashdef_lag_seconds",
@@ -443,7 +443,7 @@ const (
 The current lag can then be calculated as the time since we got a message, plus
 the lag on that message. This looks like
 
-```
+```rule
 (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 ```
 
@@ -456,7 +456,7 @@ a message.
 
 This is the metric I want to alert on. Let's write a Prometheus alert on this
 
-```
+```rule
 job:stashdef_lag:seconds =
   (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 

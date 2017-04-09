@@ -37,6 +37,12 @@ The internal arrows here are unbuffered Go channels. We use them as we perform
 the operations at different rates; scans happen in large batches, publishes are
 unbatched, and deletes use small batches.
 
+All of the monitoring here is going to be done using
+[Prometheus](https://prometheus.io/), with some small bits of
+[Grafana](https://grafana.com/). I guess you could replicate most of this with
+other monitoring systems, though I'm not sure why you'd want to. Give Prometheus
+a go. It's pretty good.
+
 # Basic Monitoring
 
 There are three main operations here that we want to monitor; scan, publish, and

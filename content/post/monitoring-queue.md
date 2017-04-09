@@ -499,7 +499,8 @@ The Slack integration is set up in our
 recommend integrating with whatever chat system your organisation uses.
 Recording rules are also a great idea, and in general if you want
 a dashboard to load quickly, I'd recommend implementing the queries you are
-plotting as recording rules.
+plotting as recording rules. All of the screenshots of Grafana plots in this
+post are actually of recording rules, not the 'raw' queries.
 
 # Putting it together
 

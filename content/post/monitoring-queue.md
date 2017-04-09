@@ -449,12 +449,42 @@ const (
 )
 ```
 
+I'm going to omit the code that writes to these metrics, as it's fairly involved
+in talking to the frontend of the service, though it looks a little like.
+
+```
+func sender(...) {
+	for time.Tick(interval) {
+		sendMessage(time.Now())
+	}
+}
+func receiver(...) {
+	for msg := range receiveMessages() {
+		lag := time.Since(msg.SentAt)
+		stashDeferredLag.Set(float64(lag) / float64(time.Second))
+		stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+	}
+}
+```
+
+Notably, this monitors more than just the Stash Deferred service, it also
+monitors the service that inserts messages into the BigTable database. You could
+question whether this really constitutes monitoring for this service, but if the
+frontend goes down, then my service's users are affected, so I want to know when
+that happens.
+
 The current lag can then be calculated as the time since we got a message, plus
 the lag on that message. This looks like
 
 ```rule
 (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 ```
+
+We don’t just track the `stashdef_lag_seconds` as if the lag monitor were to
+fail, that metric would stop updating. The safest measure of lag is the lag
+measured by the lag monitor plus the time since we last measured that lag, as if
+the lag monitor fails, the result of `time()` will continue increasing
+regardless.
 
 ![stash-lag](/imgs/stash-deferred/stash-lag.png)
 

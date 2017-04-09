@@ -19,15 +19,6 @@
 Stash Deferred is a system for deferring message writes.</description>
     </item>
     
-    <item>
-      <title>The applications of Top Gun to software engineering</title>
-      <link>http://generictestdomain.net/post/topgun/</link>
-      <pubDate>Sun, 26 Mar 2017 21:35:50 BST</pubDate>
-      
-      <guid>http://generictestdomain.net/post/topgun/</guid>
-      <description>The Merriam-Webster dictionary defines Top Gun as &amp;lsquo;a 1986 American romantic military action drama film directed by Tony Scott&amp;rsquo;. This definition might serve us well at the local pub quiz, but there is much more to learn about this film. During a recent viewing, I realised that there were a large number of useful parallels and not so parallels between the disciplines of piloting fighter aircraft in 80&amp;rsquo;s action films and developing robust software.</description>
-    </item>
-    
   </channel>
 </rss>
 

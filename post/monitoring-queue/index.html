@@ -83,6 +83,12 @@ Kinesis, then delete them from Bigtable. This look something like this:</p>
 the operations at different rates; scans happen in large batches, publishes are
 unbatched, and deletes use small batches.</p>
 
+<p>All of the monitoring here is going to be done using
+<a href="https://prometheus.io/">Prometheus</a>, with some small bits of
+<a href="https://grafana.com/">Grafana</a>. I guess you could replicate most of this with
+other monitoring systems, though I&rsquo;m not sure why you&rsquo;d want to. Give Prometheus
+a go. It&rsquo;s pretty good.</p>
+
 <h1 id="basic-monitoring">Basic Monitoring</h1>
 
 <p>There are three main operations here that we want to monitor; scan, publish, and
@@ -91,7 +97,7 @@ application) there are two properties we can easily instrument: duration and
 count. I&rsquo;ll use the Kinesis publisher as my example for this. We define two
 metrics:</p>
 
-<pre><code>var (
+<pre><code class="language-go">var (
 	kinesisWriteCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: &quot;stashdef_kinesis_message_write_total&quot;,
@@ -145,7 +151,7 @@ where using seconds as a unit could cause issues is negligible.</p>
 
 <p>With our metric set up, we can now instrument our publishing code.</p>
 
-<pre><code>func (k *KinesisWriter) Write(ctx context.Context, messageChan &lt;-chan Message, delchan chan&lt;- string) error {
+<pre><code class="language-go">func (k *KinesisWriter) Write(ctx context.Context, messageChan &lt;-chan Message, delchan chan&lt;- string) error {
 	for {
 		var msg Message
 		select {
@@ -179,14 +185,23 @@ this, we get some incredibly useful metrics. Let&rsquo;s play with them.</p>
 <p>The first thing I&rsquo;d like to see is the throughput of my system. This is the rate
 of increase of the write count metric:</p>
 
-<pre><code>rate(stashdef_kinesis_message_write_total[1m])
+<pre><code class="language-rule">rate(stashdef_kinesis_message_write_total[1m])
 </code></pre>
 
 <p>As our metric is not a continuous function, we can&rsquo;t simply differentiate it, so
 we need to specify over what period we want our rate to be calculated. This is
 the period in the square brackets. 1m is a convention within Qubit, along with
-30m for when you want a calmer view. In general, the smaller the window, the
-less data required, the faster the result.</p>
+30m for when you want a calmer, PM friendly, view. In general, the smaller the
+window, the less data required, the faster the result.</p>
+
+<p>A general note about rates: it is statistically meaningless to compare two
+metrics that have been calculated using rates across different intervals. This
+is why it is so important to develop strong conventions around rate intervals.
+Imagine a (contrived) situation where your ops team has calculated network
+traffic rates at the 5m interval and you have calculated row processing rate at
+the 30m interval. Any comparison between the two metrics now becomes a
+statistical minefield that would make Brian Brazil very unhappy if he learnt
+about it.</p>
 
 <p>When we graph this in the Prometheus UI, we get</p>
 
@@ -203,7 +218,7 @@ case, as we are interested in the throughput of the system, we probably want to
 sum all the lines together, to get the number of messages we are handling per
 second:</p>
 
-<pre><code>sum(rate(stashdef_kinesis_message_write_total[1m]))
+<pre><code class="language-rule">sum(rate(stashdef_kinesis_message_write_total[1m]))
 </code></pre>
 
 <p><img src="/imgs/stash-deferred/sum-rate-kinesis-write-total.png" alt="sum_kinesis message write rate" /></p>
@@ -212,7 +227,7 @@ second:</p>
 overall success and error rates. We can do this by summing over a specific
 label. This is similar to the <code>GROUP BY</code> statement in SQL:</p>
 
-<pre><code>sum(rate(stashdef_kinesis_message_write_total[1m])) by (result)
+<pre><code class="language-rule">sum(rate(stashdef_kinesis_message_write_total[1m])) by (result)
 </code></pre>
 
 <p>Putting that on our dashboard, we get</p>
@@ -225,7 +240,7 @@ label. This is similar to the <code>GROUP BY</code> statement in SQL:</p>
 a histogram is not particularly possible when we only have two dimensions. An
 easy to calculate statistic is the mean time the publish operation takes.</p>
 
-<pre><code>rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
+<pre><code class="language-rule">rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
   rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
 </code></pre>
 
@@ -234,7 +249,7 @@ preferred is the quantile. Prometheus allows us to calculate quantiles from
 histograms using the <a href="https://prometheus.io/docs/querying/functions/#histogram_quantile"><code>histogram_quantile</code>
 function</a>.</p>
 
-<pre><code>histogram_quantile(0.99,
+<pre><code class="language-rule">histogram_quantile(0.99,
   rate(stashdef_kinesis_message_write_duration_seconds_bucket[1m]))
 </code></pre>
 
@@ -266,7 +281,7 @@ Kinesis or deleted from Bigtable. To combat this, we maintain a list of active
 records, and do not send rows to be published if they are in the list of
 actives. This gives a rate of duplicates, which we might like to measure.</p>
 
-<pre><code>var (
+<pre><code class="language-go">var (
 	bigtableScanDuplicateCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: &quot;stashdef_duplicates_filtered_total&quot;,
@@ -329,7 +344,7 @@ diagram to metric.</p>
 incomprehensible, and the only way you&rsquo;ll get any value out of this section is
 by installing the diagram plugin and trying out it out.</p>
 
-<pre><code>graph LR
+<pre><code class="language-mermaid">graph LR
 subgraph stash
 W[User] ==&gt; S
 end
@@ -374,7 +389,7 @@ more duplicates happening than errors.</li>
 common question during an incident relating to volume is &lsquo;did someone start
 sending something new&rsquo;? We can add a metric to capture this.</p>
 
-<pre><code>var (
+<pre><code class="language-go">var (
 	kinesisDecodeCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: &quot;stashdef_kinesis_message_decode_total&quot;,
@@ -397,7 +412,7 @@ this, we probably only care about the top few streams. For this, we can use
 Prometheus&rsquo;s <a href="https://prometheus.io/docs/querying/operators/#aggregation-operators"><code>topk</code>
 aggregation</a>.</p>
 
-<pre><code>topk(4, sum(rate(stashdef_kinesis_message_decode_total[1m]) by (stream))
+<pre><code class="language-rule">topk(4, sum(rate(stashdef_kinesis_message_decode_total[1m]) by (stream))
 </code></pre>
 
 <p><img src="/imgs/stash-deferred/topk-streams.png" alt="topk-streams" /></p>
@@ -415,7 +430,7 @@ components are unbuffered, a slowdown upstream should cause the send on the
 channel to slow down, and by measuring this, we can get a sense of it there is a
 non scanner slowdown. Implementing this is easy enough.</p>
 
-<pre><code>var (
+<pre><code class="language-go">var (
 	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    &quot;stashdef_bigtable_row_scan_backpressure_seconds&quot;,
 		Help:    &quot;Backpressure on the channel out of the row scan&quot;,
@@ -463,7 +478,7 @@ call it <code>lag-monitor</code>) periodically sends messages with very short ex
 then listens to the destination queue to see how long it takes before a message
 comes through. This exposes two main metrics</p>
 
-<pre><code>const (
+<pre><code class="language-go">const (
 	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: &quot;stashdef_lag_seconds&quot;,
 		Help: &quot;The last Stash deferred lag&quot;,
@@ -475,11 +490,40 @@ comes through. This exposes two main metrics</p>
 )
 </code></pre>
 
+<p>I&rsquo;m going to omit the code that writes to these metrics, as it&rsquo;s fairly involved
+in talking to the frontend of the service, though it looks a little like.</p>
+
+<pre><code>func sender(...) {
+	for time.Tick(interval) {
+		sendMessage(time.Now())
+	}
+}
+func receiver(...) {
+	for msg := range receiveMessages() {
+		lag := time.Since(msg.SentAt)
+		stashDeferredLag.Set(float64(lag) / float64(time.Second))
+		stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+	}
+}
+</code></pre>
+
+<p>Notably, this monitors more than just the Stash Deferred service, it also
+monitors the service that inserts messages into the BigTable database. You could
+question whether this really constitutes monitoring for this service, but if the
+frontend goes down, then my service&rsquo;s users are affected, so I want to know when
+that happens.</p>
+
 <p>The current lag can then be calculated as the time since we got a message, plus
 the lag on that message. This looks like</p>
 
-<pre><code>(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+<pre><code class="language-rule">(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 </code></pre>
+
+<p>We don’t just track the <code>stashdef_lag_seconds</code> as if the lag monitor were to
+fail, that metric would stop updating. The safest measure of lag is the lag
+measured by the lag monitor plus the time since we last measured that lag, as if
+the lag monitor fails, the result of <code>time()</code> will continue increasing
+regardless.</p>
 
 <p><img src="/imgs/stash-deferred/stash-lag.png" alt="stash-lag" /></p>
 
@@ -490,7 +534,7 @@ a message.</p>
 
 <p>This is the metric I want to alert on. Let&rsquo;s write a Prometheus alert on this</p>
 
-<pre><code>job:stashdef_lag:seconds =
+<pre><code class="language-rule">job:stashdef_lag:seconds =
   (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 
 ALERT StashDeferredLagHigh
@@ -523,7 +567,8 @@ system may have very different users who rely on a different guarentees.</p>
 recommend integrating with whatever chat system your organisation uses.
 Recording rules are also a great idea, and in general if you want
 a dashboard to load quickly, I&rsquo;d recommend implementing the queries you are
-plotting as recording rules.</p>
+plotting as recording rules. All of the screenshots of Grafana plots in this
+post are actually of recording rules, not the &lsquo;raw&rsquo; queries.</p>
 
 <h1 id="putting-it-together">Putting it together</h1>
 

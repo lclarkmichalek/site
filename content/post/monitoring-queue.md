@@ -1,7 +1,6 @@
 +++
 date = "2017-04-01T21:13:56+01:00"
 title = "A worked example of monitoring a queue based application"
-draft = true
 
 tags = ["software engineering", "monitoring", "prometheus"]
 author = "Laurie Clark-Michalek"

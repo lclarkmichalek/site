@@ -400,7 +400,7 @@ var (
 	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "stashdef_bigtable_row_scan_backpressure_seconds",
 		Help:    "Backpressure on the channel out of the row scan",
-		Buckets: prometheus.ExponentialBuckets(0.001, 3, 6),
+		Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
 	})
 )
 

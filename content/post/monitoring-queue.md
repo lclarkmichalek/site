@@ -63,7 +63,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "stashdef_kinesis_message_write_duration_seconds",
 			Help:    "duration of kinesis write operations",
-			Buckets: prometheus.ExponentialBuckets(0.1, 3, 6),
+			Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
 		},
 	)
 )
@@ -94,8 +94,11 @@ The second metric is the variable `kinesisWriteDuration`, registered as
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
 exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
-exponent, and 6 being the number of buckets. This results in buckets counting
-requests [0,0.1), [0.1,0.3), [0.3,0.9), etc etc.
+exponent, and 6 being the number of buckets. This results roughly in buckets
+counting requests where the durations were between [0,0.1), [0.1,0.316..),
+[0.316..,1), etc etc. The use of `math.Sqrt(10)` gives us 2 buckets per order of
+magnitude, which is useful to cover a large range of possible durations when you
+don't know what the 'normal' range for the operation is.
 
 The other change is in the name of the metric, where we exchange `total` for
 `duration_seconds`. Adding the unit to the metric name makes life easier for

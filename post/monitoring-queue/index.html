@@ -98,20 +98,20 @@ count. I&rsquo;ll use the Kinesis publisher as my example for this. We define tw
 metrics:</p>
 
 <pre><code class="language-go">var (
-	kinesisWriteCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: &quot;stashdef_kinesis_message_write_total&quot;,
-			Help: &quot;count of kinesis messages written, tagged by result&quot;,
-		},
-		[]string{&quot;result&quot;},
-	)
-	kinesisWriteDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    &quot;stashdef_kinesis_message_write_duration_seconds&quot;,
-			Help:    &quot;duration of kinesis write operations&quot;,
-			Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
-		},
-	)
+  kinesisWriteCount = prometheus.NewCounterVec(
+    prometheus.CounterOpts{
+      Name: &quot;stashdef_kinesis_message_write_total&quot;,
+      Help: &quot;count of kinesis messages written, tagged by result&quot;,
+    },
+    []string{&quot;result&quot;},
+  )
+  kinesisWriteDuration = prometheus.NewHistogram(
+    prometheus.HistogramOpts{
+      Name:    &quot;stashdef_kinesis_message_write_duration_seconds&quot;,
+      Help:    &quot;duration of kinesis write operations&quot;,
+      Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
+    },
+  )
 )
 </code></pre>
 
@@ -155,30 +155,30 @@ where using seconds as a unit could cause issues is negligible.</p>
 <p>With our metric set up, we can now instrument our publishing code.</p>
 
 <pre><code class="language-go">func (k *KinesisWriter) Write(ctx context.Context, messageChan &lt;-chan Message, delchan chan&lt;- string) error {
-	for {
-		var msg Message
-		select {
-		case &lt;-ctx.Done():
-			return ctx.Err()
-		case msg = &lt;-messageChan:
-		}
+  for {
+    var msg Message
+    select {
+    case &lt;-ctx.Done():
+      return ctx.Err()
+    case msg = &lt;-messageChan:
+    }
 
-		started := time.Now()
-		err := k.publish(msg)
-		if err != nil {
-			log.Warningf(&quot;could not publish message: %v&quot;, err)
-			kinesisWriteCount.WithLabelValues(&quot;failure&quot;).Inc()
-		} else {
-			kinesisWriteCount.WithLabelValues(&quot;success&quot;).Inc()
-		}
-		kinesisWriteDuration.Observe(float64(time.Since(started)) / float64(time.Second))
+    started := time.Now()
+    err := k.publish(msg)
+    if err != nil {
+      log.Warningf(&quot;could not publish message: %v&quot;, err)
+      kinesisWriteCount.WithLabelValues(&quot;failure&quot;).Inc()
+    } else {
+      kinesisWriteCount.WithLabelValues(&quot;success&quot;).Inc()
+    }
+    kinesisWriteDuration.Observe(float64(time.Since(started)) / float64(time.Second))
 
-		select {
-		case &lt;-ctx.Done():
-			return ctx.Err()
-		case delchan &lt;- msg.AckId:
-		}
-	}
+    select {
+    case &lt;-ctx.Done():
+      return ctx.Err()
+    case delchan &lt;- msg.AckId:
+    }
+  }
 }
 </code></pre>
 
@@ -285,25 +285,25 @@ records, and do not send rows to be published if they are in the list of
 actives. This gives a rate of duplicates, which we might like to measure.</p>
 
 <pre><code class="language-go">var (
-	bigtableScanDuplicateCount = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: &quot;stashdef_duplicates_filtered_total&quot;,
-			Help: &quot;Count of duplicate messages filtered on scan&quot;,
-		},
-	)
+  bigtableScanDuplicateCount = prometheus.NewCounter(
+    prometheus.CounterOpts{
+      Name: &quot;stashdef_duplicates_filtered_total&quot;,
+      Help: &quot;Count of duplicate messages filtered on scan&quot;,
+    },
+  )
 )
 
 func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&lt;- Message) error {
 ...
-	if b.IsActive(msg) {
-		bigtableScanDuplicateCount.Inc()
-	} else {
-		select {
-		case &lt;-ctx.Done():
-			return ctx.Err()
-		case messageChan &lt;- msg:
-		}
-	}
+  if b.IsActive(msg) {
+    bigtableScanDuplicateCount.Inc()
+  } else {
+    select {
+    case &lt;-ctx.Done():
+      return ctx.Err()
+    case messageChan &lt;- msg:
+    }
+  }
 ...
 }
 </code></pre>
@@ -393,13 +393,13 @@ common question during an incident relating to volume is &lsquo;did someone star
 sending something new&rsquo;? We can add a metric to capture this.</p>
 
 <pre><code class="language-go">var (
-	kinesisDecodeCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: &quot;stashdef_kinesis_message_decode_total&quot;,
-			Help: &quot;count of kinesis messages written, tagged by stream name&quot;,
-		},
-		[]string{&quot;stream&quot;},
-	)
+  kinesisDecodeCount = prometheus.NewCounterVec(
+    prometheus.CounterOpts{
+      Name: &quot;stashdef_kinesis_message_decode_total&quot;,
+      Help: &quot;count of kinesis messages written, tagged by stream name&quot;,
+    },
+    []string{&quot;stream&quot;},
+  )
 )
 </code></pre>
 
@@ -434,22 +434,22 @@ channel to slow down, and by measuring this, we can get a sense of it there is a
 non scanner slowdown. Implementing this is easy enough.</p>
 
 <pre><code class="language-go">var (
-	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:    &quot;stashdef_bigtable_row_scan_backpressure_seconds&quot;,
-		Help:    &quot;Backpressure on the channel out of the row scan&quot;,
-		Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
-	})
+  bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
+    Name:    &quot;stashdef_bigtable_row_scan_backpressure_seconds&quot;,
+    Help:    &quot;Backpressure on the channel out of the row scan&quot;,
+    Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
+  })
 )
 
 func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&lt;- Message) error {
 ...
-	sendStarted := time.Now()
-	select {
-	case &lt;-ctx.Done():
-		return ctx.Err()
-	case messageChan &lt;- msg:
-	}
-	bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
+  sendStarted := time.Now()
+  select {
+  case &lt;-ctx.Done():
+    return ctx.Err()
+  case messageChan &lt;- msg:
+  }
+  bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
 ...
 }
 </code></pre>
@@ -482,14 +482,14 @@ then listens to the destination queue to see how long it takes before a message
 comes through. This exposes two main metrics</p>
 
 <pre><code class="language-go">const (
-	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: &quot;stashdef_lag_seconds&quot;,
-		Help: &quot;The last Stash deferred lag&quot;,
-	})
-	stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: &quot;stashdef_last_received_timestamp_seconds&quot;,
-		Help: &quot;The timestamp when we last received a message from Stash deferred&quot;,
-	})
+  stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: &quot;stashdef_lag_seconds&quot;,
+    Help: &quot;The last Stash deferred lag&quot;,
+  })
+  stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: &quot;stashdef_last_received_timestamp_seconds&quot;,
+    Help: &quot;The timestamp when we last received a message from Stash deferred&quot;,
+  })
 )
 </code></pre>
 
@@ -497,16 +497,16 @@ comes through. This exposes two main metrics</p>
 in talking to the frontend of the service, though it looks a little like.</p>
 
 <pre><code>func sender(...) {
-	for time.Tick(interval) {
-		sendMessage(time.Now())
-	}
+  for time.Tick(interval) {
+    sendMessage(time.Now())
+  }
 }
 func receiver(...) {
-	for msg := range receiveMessages() {
-		lag := time.Since(msg.SentAt)
-		stashDeferredLag.Set(float64(lag) / float64(time.Second))
-		stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
-	}
+  for msg := range receiveMessages() {
+    lag := time.Since(msg.SentAt)
+    stashDeferredLag.Set(float64(lag) / float64(time.Second))
+    stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+  }
 }
 </code></pre>
 

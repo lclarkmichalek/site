@@ -52,20 +52,20 @@ metrics:
 
 ```go
 var (
-	kinesisWriteCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "stashdef_kinesis_message_write_total",
-			Help: "count of kinesis messages written, tagged by result",
-		},
-		[]string{"result"},
-	)
-	kinesisWriteDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "stashdef_kinesis_message_write_duration_seconds",
-			Help:    "duration of kinesis write operations",
-			Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
-		},
-	)
+  kinesisWriteCount = prometheus.NewCounterVec(
+    prometheus.CounterOpts{
+      Name: "stashdef_kinesis_message_write_total",
+      Help: "count of kinesis messages written, tagged by result",
+    },
+    []string{"result"},
+  )
+  kinesisWriteDuration = prometheus.NewHistogram(
+    prometheus.HistogramOpts{
+      Name:    "stashdef_kinesis_message_write_duration_seconds",
+      Help:    "duration of kinesis write operations",
+      Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
+    },
+  )
 )
 ```
 
@@ -110,30 +110,30 @@ With our metric set up, we can now instrument our publishing code.
 
 ```go
 func (k *KinesisWriter) Write(ctx context.Context, messageChan <-chan Message, delchan chan<- string) error {
-	for {
-		var msg Message
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case msg = <-messageChan:
-		}
+  for {
+    var msg Message
+    select {
+    case <-ctx.Done():
+      return ctx.Err()
+    case msg = <-messageChan:
+    }
 
-		started := time.Now()
-		err := k.publish(msg)
-		if err != nil {
-			log.Warningf("could not publish message: %v", err)
-			kinesisWriteCount.WithLabelValues("failure").Inc()
-		} else {
-			kinesisWriteCount.WithLabelValues("success").Inc()
-		}
-		kinesisWriteDuration.Observe(float64(time.Since(started)) / float64(time.Second))
+    started := time.Now()
+    err := k.publish(msg)
+    if err != nil {
+      log.Warningf("could not publish message: %v", err)
+      kinesisWriteCount.WithLabelValues("failure").Inc()
+    } else {
+      kinesisWriteCount.WithLabelValues("success").Inc()
+    }
+    kinesisWriteDuration.Observe(float64(time.Since(started)) / float64(time.Second))
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case delchan <- msg.AckId:
-		}
-	}
+    select {
+    case <-ctx.Done():
+      return ctx.Err()
+    case delchan <- msg.AckId:
+    }
+  }
 }
 ```
 
@@ -246,25 +246,25 @@ actives. This gives a rate of duplicates, which we might like to measure.
 
 ```go
 var (
-	bigtableScanDuplicateCount = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "stashdef_duplicates_filtered_total",
-			Help: "Count of duplicate messages filtered on scan",
-		},
-	)
+  bigtableScanDuplicateCount = prometheus.NewCounter(
+    prometheus.CounterOpts{
+      Name: "stashdef_duplicates_filtered_total",
+      Help: "Count of duplicate messages filtered on scan",
+    },
+  )
 )
 
 func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan<- Message) error {
 ...
-	if b.IsActive(msg) {
-		bigtableScanDuplicateCount.Inc()
-	} else {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case messageChan <- msg:
-		}
-	}
+  if b.IsActive(msg) {
+    bigtableScanDuplicateCount.Inc()
+  } else {
+    select {
+    case <-ctx.Done():
+      return ctx.Err()
+    case messageChan <- msg:
+    }
+  }
 ...
 }
 ```
@@ -354,13 +354,13 @@ sending something new'? We can add a metric to capture this.
 
 ```go
 var (
-	kinesisDecodeCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "stashdef_kinesis_message_decode_total",
-			Help: "count of kinesis messages written, tagged by stream name",
-		},
-		[]string{"stream"},
-	)
+  kinesisDecodeCount = prometheus.NewCounterVec(
+    prometheus.CounterOpts{
+      Name: "stashdef_kinesis_message_decode_total",
+      Help: "count of kinesis messages written, tagged by stream name",
+    },
+    []string{"stream"},
+  )
 )
 ```
 
@@ -397,22 +397,22 @@ non scanner slowdown. Implementing this is easy enough.
 
 ```go
 var (
-	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:    "stashdef_bigtable_row_scan_backpressure_seconds",
-		Help:    "Backpressure on the channel out of the row scan",
-		Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
-	})
+  bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
+    Name:    "stashdef_bigtable_row_scan_backpressure_seconds",
+    Help:    "Backpressure on the channel out of the row scan",
+    Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
+  })
 )
 
 func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan<- Message) error {
 ...
-	sendStarted := time.Now()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case messageChan <- msg:
-	}
-	bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
+  sendStarted := time.Now()
+  select {
+  case <-ctx.Done():
+    return ctx.Err()
+  case messageChan <- msg:
+  }
+  bigtableScanBackpressure.Observe(float64(time.Since(sendStarted)) / float64(time.Second))
 ...
 }
 ```
@@ -446,14 +446,14 @@ comes through. This exposes two main metrics
 
 ```go
 const (
-	stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "stashdef_lag_seconds",
-		Help: "The last Stash deferred lag",
-	})
-	stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "stashdef_last_received_timestamp_seconds",
-		Help: "The timestamp when we last received a message from Stash deferred",
-	})
+  stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: "stashdef_lag_seconds",
+    Help: "The last Stash deferred lag",
+  })
+  stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: "stashdef_last_received_timestamp_seconds",
+    Help: "The timestamp when we last received a message from Stash deferred",
+  })
 )
 ```
 
@@ -462,16 +462,16 @@ in talking to the frontend of the service, though it looks a little like.
 
 ```
 func sender(...) {
-	for time.Tick(interval) {
-		sendMessage(time.Now())
-	}
+  for time.Tick(interval) {
+    sendMessage(time.Now())
+  }
 }
 func receiver(...) {
-	for msg := range receiveMessages() {
-		lag := time.Since(msg.SentAt)
-		stashDeferredLag.Set(float64(lag) / float64(time.Second))
-		stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
-	}
+  for msg := range receiveMessages() {
+    lag := time.Since(msg.SentAt)
+    stashDeferredLag.Set(float64(lag) / float64(time.Second))
+    stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+  }
 }
 ```
 

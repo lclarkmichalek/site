@@ -71,7 +71,7 @@ given.</p>
 Scan allows you to request values between two keys, in lexicographical
 (alphabetical) order. This is the operation that Stash Deferred uses to fetch
 messages that should be sent. Every interval we send a request for all of the
-values with keys between &lsquo;deferred:&rsquo; and &lsquo;deferred:<current unix timestamp>&rsquo;.
+values with keys between <code>deferred:</code> and <code>deferred:&lt;current unix timestamp&gt;</code>.
 These are the messages have &lsquo;expired&rsquo;, and should be put onto the Kinesis queue.</p>
 
 <p>So, fairly simple. We read rows from Bigtable, publish their contents to

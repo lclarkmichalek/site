@@ -24,7 +24,7 @@ Bigtable is a key value store that supports 'get', 'set', 'delete' and 'scan'.
 Scan allows you to request values between two keys, in lexicographical
 (alphabetical) order. This is the operation that Stash Deferred uses to fetch
 messages that should be sent. Every interval we send a request for all of the
-values with keys between 'deferred:' and 'deferred:<current unix timestamp>'.
+values with keys between `deferred:` and `deferred:<current unix timestamp>`.
 These are the messages have 'expired', and should be put onto the Kinesis queue.
 
 So, fairly simple. We read rows from Bigtable, publish their contents to

@@ -19,7 +19,7 @@
   
   
 
-  <link rel="stylesheet" type="text/css" href="http://generictestdomain.net//css/combined-min.css">
+  <link rel="stylesheet" type="text/css" href="http://generictestdomain.net/css/combined-min.css">
 
 </head>
 <body class="">
@@ -28,7 +28,7 @@
   <header class="site-header px2 px-responsive">
   <div class="mt2 wrap">
     <div class="measure">
-      <a href="http://generictestdomain.net/" class="site-title">generic test domain</a>
+      <a href="http://generictestdomain.net" class="site-title">generic test domain</a>
       <nav class="site-nav right">
       <a href="/about/">About</a>
 <a href="/tags">Tags</a>
@@ -109,7 +109,7 @@ metrics:</p>
 		prometheus.HistogramOpts{
 			Name:    &quot;stashdef_kinesis_message_write_duration_seconds&quot;,
 			Help:    &quot;duration of kinesis write operations&quot;,
-			Buckets: prometheus.ExponentialBuckets(0.1, 3, 6),
+			Buckets: prometheus.ExponentialBuckets(0.1, math.Sqrt(10), 6),
 		},
 	)
 )
@@ -140,8 +140,11 @@ which has two values: <code>success</code> and <code>failure</code>.</p>
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
 exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
-exponent, and 6 being the number of buckets. This results in buckets counting
-requests [0,0.1), [0.1,0.3), [0.3,0.9), etc etc.</p>
+exponent, and 6 being the number of buckets. This results roughly in buckets
+counting requests where the durations were between [0,0.1), [0.1,0.316..),
+[0.316..,1), etc etc. The use of <code>math.Sqrt(10)</code> gives us 2 buckets per order of
+magnitude, which is useful to cover a large range of possible durations when you
+don&rsquo;t know what the &lsquo;normal&rsquo; range for the operation is.</p>
 
 <p>The other change is in the name of the metric, where we exchange <code>total</code> for
 <code>duration_seconds</code>. Adding the unit to the metric name makes life easier for
@@ -434,7 +437,7 @@ non scanner slowdown. Implementing this is easy enough.</p>
 	bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    &quot;stashdef_bigtable_row_scan_backpressure_seconds&quot;,
 		Help:    &quot;Backpressure on the channel out of the row scan&quot;,
-		Buckets: prometheus.ExponentialBuckets(0.001, 3, 6),
+		Buckets: prometheus.ExponentialBuckets(0.001, math.Sqrt(10), 6),
 	})
 )
 
@@ -596,13 +599,13 @@ holistic manner in the lag monitor component.</p>
       <p class="post-meta">Tags:&nbsp;
         
             
-            <a href="http://generictestdomain.net//tags/software%20engineering">software engineering</a>
+            <a href="http://generictestdomain.net/tags/software%20engineering">software engineering</a>
         
             ,&nbsp;
-            <a href="http://generictestdomain.net//tags/monitoring">monitoring</a>
+            <a href="http://generictestdomain.net/tags/monitoring">monitoring</a>
         
             ,&nbsp;
-            <a href="http://generictestdomain.net//tags/prometheus">prometheus</a>
+            <a href="http://generictestdomain.net/tags/prometheus">prometheus</a>
         
       </p>
 
@@ -616,6 +619,8 @@ holistic manner in the lag monitor component.</p>
         <div class="measure mt1 center">
       <nav class="social-icons icons">
 <a class="fa fa-rss rss" href="/index.xml"></a>
+
+<a class="fa fa-twitter twitter" href="https://twitter.com/lclarkmichalek"></a>
 
 </nav>
 
@@ -633,6 +638,17 @@ holistic manner in the lag monitor component.</p>
 
     
     
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-25243984-2', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
 
 
 </body>

@@ -29,6 +29,31 @@ Stash Deferred is a system for deferring message writes.</description>
 The particular problem I&amp;rsquo;ll talk about today is IP level overlay networks. The basic problem these overlay networks try to solve is &amp;ldquo;I have 1 IP per machine, but I need a subnet multiple IPs per machine&amp;rdquo;.</description>
     </item>
     
+    <item>
+      <title>About</title>
+      <link>http://generictestdomain.net/about/</link>
+      <pubDate>Sat, 08 Nov 2014 16:42:18 &#43;0400</pubDate>
+      
+      <guid>http://generictestdomain.net/about/</guid>
+      <description>I&amp;rsquo;m Laurie Clark-Michalek. I&amp;rsquo;m a software engineer at Qubit, where I bounce between product work and infrastructure work. I care quite a lot about building systems that people don&amp;rsquo;t hate, be they the user, the developer, or the poor soul who had the pager the night everything broke.
+Twitter: @lclarkmichalek
+Mastodon: @lcm@mastodon.social
+Github: @lclarkmichalek
+Email: lclarkmichalek@gmail.com</description>
+    </item>
+    
+    <item>
+      <title>Contact</title>
+      <link>http://generictestdomain.net/contact/</link>
+      <pubDate>Sat, 08 Nov 2014 16:42:18 &#43;0400</pubDate>
+      
+      <guid>http://generictestdomain.net/contact/</guid>
+      <description>Twitter: @lclarkmichalek
+Mastodon: @lcm@mastodon.social
+Github: @lclarkmichalek
+Email: lclarkmichalek@gmail.com</description>
+    </item>
+    
   </channel>
 </rss>
 

@@ -573,7 +573,10 @@ continuously calculate and store our lag, along with an alert on that lag
 calculation.  The alert syntax is a wee bit odd, but should read: the alert
 `StashDeferredLagHigh` will fire if the metric `job:stashdef_lag:seconds` is
 greater than 300 for 2 minutes. When it fires, it should send to the slack
-channel `stash-deferred`, with the following description [description omitted].
+channel `stash-deferred`. The `description` annotations specifies what message
+the receivers of the alert will get. We've used alertmanager's templating to
+inject the current value of the lag into the alert text. This templating works
+in any label or annotation, and can reference labels on the metrics also.
 
 The durations specified in the alert above are a bit arbitrary, and will be
 subject to tweaks over time. With the current setup, we can say that should the

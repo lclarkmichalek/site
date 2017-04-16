@@ -35,18 +35,19 @@ in this.&lt;/p&gt;
 &lt;p&gt;However, this post is quite long, so I&amp;rsquo;ll try and sum it up:&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;If you don&amp;rsquo;t know what to monitor about an operation monitor rate (split by
-success and failure) and duration.&lt;/li&gt;
-&lt;li&gt;Dashboards aren&amp;rsquo;t just for you. Don&amp;rsquo;t just bung some graphs on a dashboard
-and call it monitoring&lt;/li&gt;
+&lt;li&gt;If you don&amp;rsquo;t know what to monitor about an operation, monitor duration, rate
+of success, and rate of failure.&lt;/li&gt;
+&lt;li&gt;Dashboards need to be understood by other people. Don&amp;rsquo;t just bung some graphs
+on a dashboard and call it monitoring&lt;/li&gt;
 &lt;li&gt;Dashboards as documentation™. A well built dashboard can explain the
-architecture of your application.&lt;/li&gt;
+architecture of your application. Diagrams are great for this.&lt;/li&gt;
 &lt;li&gt;Page on user impact; alert on other things, just don&amp;rsquo;t wake me up
 unless it&amp;rsquo;s actually impacting the user.&lt;/li&gt;
 &lt;li&gt;If the system is queue based, lag is probably a metric correlated with user
 impact.&lt;/li&gt;
 &lt;li&gt;You can use tracer messages to monitor lag.&lt;/li&gt;
-&lt;li&gt;If a metric changes randomly for no reason, it probably isn&amp;rsquo;t useful.&lt;/li&gt;
+&lt;li&gt;If a metric changes and you don&amp;rsquo;t know why it changed, or what that implies
+about the system, it probably isn&amp;rsquo;t useful.&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h1 id=&#34;stash-deferred&#34;&gt;Stash Deferred&lt;/h1&gt;
@@ -610,8 +611,10 @@ component restarts well, which is very useful during incidents.&lt;/li&gt;
 &lt;p&gt;In the future, as I gain more experience operating this service, I plan to
 demote some of the duration metrics to below the fold on this dashboard, as they
 seem to be subject to seemingly alarming changes under completely normal
-operation. I also hope to spend some time addressing dropped messages in a more
-holistic manner in the lag monitor component.&lt;/p&gt;
+operation (I have a theory relating to tablet merging in BigTable, but even
+then, if that knowledge is not available in the dashboard, the graph is
+misleading). I also hope to spend some time addressing dropped messages in a
+more holistic manner in the lag monitor component.&lt;/p&gt;
 </description>
     </item>
     

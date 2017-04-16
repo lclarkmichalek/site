@@ -354,20 +354,20 @@ by installing the diagram plugin and trying out it out.
 ```mermaid
 graph LR
 subgraph stash
-W[User] ==> S
+  W[User] ==> S
 end
 
 S(Stash) ==> A[BigTable]
 
 subgraph deferred-backend
-A ==> B(BT Scaner)
-B --> B1>Duplicate]
-B --> B2>Error]
-B ==> C(Kinesis Publisher)
-C --> C1>Error]
-C ==> D(BT Deleter)
-D ==> A
-D --> D1>Error]
+  A ==> B(BT Scaner)
+  B --> B1>Duplicate]
+  B --> B2>Error]
+  B ==> C(Kinesis Publisher)
+  C --> C1>Error]
+  C ==> D(BT Deleter)
+  D ==> A
+  D --> D1>Error]
 end
 C ==> E[Kinesis]
 ```

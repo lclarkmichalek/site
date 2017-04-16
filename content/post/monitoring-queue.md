@@ -165,11 +165,15 @@ of increase of the write count metric:
 rate(stashdef_kinesis_message_write_total[1m])
 ```
 
-As our metric is not a continuous function, we can't simply differentiate it, so
-we need to specify over what period we want our rate to be calculated. This is
-the period in the square brackets. 1m is a convention within Qubit, along with
-30m for when you want a calmer, PM friendly, view. In general, the smaller the
-window, the less data required, the faster the result.
+The [`rate` function](https://prometheus.io/docs/querying/functions/#rate\(\))
+here takes the counter and works out the rate of increase, ignoring any times
+that the counter decreases (counters can only decrease when the program restarts
+and they are reset to 0). As our metric is not a continuous function, we can't
+simply differentiate it, so we need to specify over what period we want our rate
+to be calculated. This is the period in the square brackets. 1m is a convention
+within Qubit, along with 30m for when you want a calmer, PM friendly, view. The
+smaller the window, the less data required, the faster the result, so 1m is
+great for quick plots and dashboards.
 
 A general note about rates: it is statistically meaningless to compare two
 metrics that have been calculated using rates across different intervals. This
@@ -177,8 +181,8 @@ is why it is so important to develop strong conventions around rate intervals.
 Imagine a (contrived) situation where your ops team has calculated network
 traffic rates at the 5m interval and you have calculated row processing rate at
 the 30m interval. Any comparison between the two metrics now becomes a
-statistical minefield that would make Brian Brazil very unhappy if he learnt
-about it.
+statistical minefield that would make [Brian Brazil very
+unhappy](https://www.youtube.com/watch?v=67Ulrq6DxwA) if he learnt about it.
 
 When we graph this in the Prometheus UI, we get
 

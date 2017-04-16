@@ -534,6 +534,10 @@ the lag on that message. This looks like
 (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 ```
 
+The Prometheus [`time()` function](https://prometheus.io/docs/querying/functions/#time\(\))
+returns the current unix epoch time in seconds. Because all Prometheus metrics
+are 64 bit floating point numbers, we still get subsecond granularity.
+
 We don’t just track the `stashdef_lag_seconds` as if the lag monitor were to
 fail, that metric would stop updating. The safest measure of lag is the lag
 measured by the lag monitor plus the time since we last measured that lag, as if

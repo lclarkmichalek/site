@@ -123,7 +123,7 @@ everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
 where using seconds as a unit could cause issues is negligible.
 
-With our metric set up, we can now instrument our publishing code.
+With our metrics set up, we can now instrument our publishing code.
 
 ```go
 func (k *KinesisWriter) Write(ctx context.Context, messageChan <-chan Message, delchan chan<- string) error {
@@ -154,8 +154,9 @@ func (k *KinesisWriter) Write(ctx context.Context, messageChan <-chan Message, d
 }
 ```
 
-Gripping stuff. I've omitted some code that handles retries and suchlike. With
-this, we get some incredibly useful metrics. Let's play with them.
+Gripping stuff. I've omitted some code that handles determining if an error is
+retryable and suchlike. With this, we get some incredibly useful metrics. Let's
+play with them.
 
 The first thing I'd like to see is the throughput of my system. This is the rate
 of increase of the write count metric:

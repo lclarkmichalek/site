@@ -6,7 +6,23 @@ tags = ["software engineering", "monitoring", "prometheus"]
 author = "Laurie Clark-Michalek"
 +++
 
-# Stash Deferred
+# How to monitor: Queue based applications
+
+The state of the monitoring ecosystem nowadays is pretty amazing. There are tons
+of tools that make it easy to add metrics to your systems and alerts to your
+metrics. However, that's not enough to actually get much value out of your
+monitoring. It just makes it possible to ask 'what should I be monitoring' and
+'what should I be alerting'.
+
+This post aims to go through a real service in production at Qubit, and the
+metrics and alerts on it. More importantly, it covers the rationale behind the
+decisions, and points out the various patterns that occur when implementing
+monitoring. Some of those patterns are general to almost any application, while
+others are specific to queue based applications. Regardless of if you regularly
+write or operate queue based applications, there should be some value somewhere
+in this.
+
+## Stash Deferred
 
 At Qubit, we have a service named 'Stash Deferred'. It reads from a database,
 [GCP's Cloud Bigtable](https://cloud.google.com/bigtable/), and writes to

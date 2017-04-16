@@ -102,8 +102,8 @@ with their use.
 
 The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
-dimensions. In Qubit, we have a convention of having a label called result,
-which has two values: `success` and `failure`.
+dimensions. In Qubit, we have a convention of having a label on this kind of
+counter called result, which has two values: `success` and `failure`.
 
 The second metric is the variable `kinesisWriteDuration`, registered as
 `stashdef_kinesis_message_write_duration_seconds`. Much the same as the above,

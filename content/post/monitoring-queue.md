@@ -232,10 +232,11 @@ rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
   rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
 ```
 
-However the mean is a widely discredited statistic in monitoring circles. Much
-preferred is the quantile. Prometheus allows us to calculate quantiles from
-histograms using the [`histogram_quantile`
-function](https://prometheus.io/docs/querying/functions/#histogram_quantile).
+However the mean is a [widely
+discredited](https://landing.google.com/sre/book/chapters/monitoring-distributed-systems.html#worrying-about-your-tail-or-instrumentation-and-performance-Yms9Ck)
+statistic in monitoring circles. Much preferred is the quantile. Prometheus
+allows us to calculate (approximate) quantiles from histograms using the
+[`histogram_quantile` function](https://prometheus.io/docs/querying/functions/#histogram_quantile).
 
 ```rule
 histogram_quantile(0.99,

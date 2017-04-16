@@ -259,7 +259,7 @@ And now repeat for the other two operations. We now have basic instrumentation
 that we could apply to pretty much any operation in any program, and get some
 form of useful result.
 
-## Slightly interesting monitoring
+# Slightly interesting monitoring
 
 Is there anything more we need to measure about our program? There are a few
 things that this program does that verge on interesting, and we should probably
@@ -286,6 +286,7 @@ func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan<- Message) 
   if b.IsActive(msg) {
     bigtableScanDuplicateCount.Inc()
   } else {
+    b.MakeActive(msg)
     select {
     case <-ctx.Done():
       return ctx.Err()

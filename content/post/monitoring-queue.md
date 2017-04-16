@@ -425,6 +425,9 @@ topk(4, sum(rate(stashdef_kinesis_message_decode_total[1m]) by (stream))
 
 ![topk-streams](/imgs/stash-deferred/topk-streams.png)
 
+I've expertly photoshopped out the stream names, as they're a wee bit sensitive,
+but you get the picture.
+
 I'm never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the re-added it. It's probably worth
 having, but looking at it for too long will turn it into a vanity metric.

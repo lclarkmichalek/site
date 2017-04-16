@@ -392,8 +392,8 @@ General notes on the diagram plugin:
 ## Top users
 
 Nothing we've done so far introspects the data coming through our system. One
-common question during an incident relating to volume is 'did someone start
-sending something new'? We can add a metric to capture this.
+common question during an incident relating to volume and capacity is 'did
+someone start sending something new'? We can add a metric to capture this.
 
 ```go
 var (

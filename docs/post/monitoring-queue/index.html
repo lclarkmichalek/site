@@ -22,8 +22,8 @@
 		
 
 		<meta property="og:title" content="A worked example of monitoring a queue based application" />
-<meta property="og:description" content="Stash Deferred At Qubit, we have a service named &lsquo;Stash Deferred&rsquo;. It reads from a database, GCP&rsquo;s Cloud Bigtable, and writes to AWS&rsquo;s Kinesis. Recently it underwent a bit of a renovation by the team that I am on, and a colleague commented that the end result had quite good monitoring, potentially worth of being a case study. So here&rsquo;s that.
-Stash Deferred is a system for deferring message writes." />
+<meta property="og:description" content="How to monitor: Queue based applications The state of the monitoring ecosystem nowadays is pretty amazing. There are tons of tools that make it easy to add metrics to your systems and alerts to your metrics. However, that&rsquo;s not enough to actually get much value out of your monitoring. It just makes it possible to ask &lsquo;what should I be monitoring&rsquo; and &lsquo;what should I be alerting&rsquo;.
+This post aims to go through a real service in production at Qubit, and the metrics and alerts on it." />
 <meta property="og:type" content="article" />
 <meta property="og:url" content="http://generictestdomain.net/post/monitoring-queue/" />
 
@@ -45,12 +45,12 @@ Stash Deferred is a system for deferring message writes." />
 	    
 	    
 <meta itemprop="name" content="A worked example of monitoring a queue based application">
-<meta itemprop="description" content="Stash Deferred At Qubit, we have a service named &lsquo;Stash Deferred&rsquo;. It reads from a database, GCP&rsquo;s Cloud Bigtable, and writes to AWS&rsquo;s Kinesis. Recently it underwent a bit of a renovation by the team that I am on, and a colleague commented that the end result had quite good monitoring, potentially worth of being a case study. So here&rsquo;s that.
-Stash Deferred is a system for deferring message writes.">
+<meta itemprop="description" content="How to monitor: Queue based applications The state of the monitoring ecosystem nowadays is pretty amazing. There are tons of tools that make it easy to add metrics to your systems and alerts to your metrics. However, that&rsquo;s not enough to actually get much value out of your monitoring. It just makes it possible to ask &lsquo;what should I be monitoring&rsquo; and &lsquo;what should I be alerting&rsquo;.
+This post aims to go through a real service in production at Qubit, and the metrics and alerts on it.">
 
 
 <meta itemprop="dateModified" content="2017-04-01T21:13:56&#43;01:00" />
-<meta itemprop="wordCount" content="3284">
+<meta itemprop="wordCount" content="3730">
 
 
 
@@ -64,8 +64,8 @@ Stash Deferred is a system for deferring message writes.">
 
 <meta name="twitter:text:title" content="A worked example of monitoring a queue based application"/>
 <meta name="twitter:title" content="A worked example of monitoring a queue based application"/>
-<meta name="twitter:description" content="Stash Deferred At Qubit, we have a service named &lsquo;Stash Deferred&rsquo;. It reads from a database, GCP&rsquo;s Cloud Bigtable, and writes to AWS&rsquo;s Kinesis. Recently it underwent a bit of a renovation by the team that I am on, and a colleague commented that the end result had quite good monitoring, potentially worth of being a case study. So here&rsquo;s that.
-Stash Deferred is a system for deferring message writes."/>
+<meta name="twitter:description" content="How to monitor: Queue based applications The state of the monitoring ecosystem nowadays is pretty amazing. There are tons of tools that make it easy to add metrics to your systems and alerts to your metrics. However, that&rsquo;s not enough to actually get much value out of your monitoring. It just makes it possible to ask &lsquo;what should I be monitoring&rsquo; and &lsquo;what should I be alerting&rsquo;.
+This post aims to go through a real service in production at Qubit, and the metrics and alerts on it."/>
 <meta name="twitter:site" content="@https://www.twitter.com/lclarkmichalek"/>
 
 	</head>
@@ -106,6 +106,39 @@ Stash Deferred is a system for deferring message writes."/>
                 </header>
                 <section id="post-body">
                     
+
+<h1 id="how-to-monitor-queue-based-applications">How to monitor: Queue based applications</h1>
+
+<p>The state of the monitoring ecosystem nowadays is pretty amazing. There are tons
+of tools that make it easy to add metrics to your systems and alerts to your
+metrics. However, that&rsquo;s not enough to actually get much value out of your
+monitoring. It just makes it possible to ask &lsquo;what should I be monitoring&rsquo; and
+&lsquo;what should I be alerting&rsquo;.</p>
+
+<p>This post aims to go through a real service in production at Qubit, and the
+metrics and alerts on it. More importantly, it covers the rationale behind the
+decisions, and points out the various patterns that occur when implementing
+monitoring. Some of those patterns are general to almost any application, while
+others are specific to queue based applications. Regardless of if you regularly
+write or operate queue based applications, there should be some value somewhere
+in this.</p>
+
+<p>However, this post is quite long, so I&rsquo;ll try and sum it up:</p>
+
+<ol>
+<li>If you don&rsquo;t know what to monitor about an operation monitor rate (split by
+success and failure) and duration.</li>
+<li>Dashboards aren&rsquo;t just for you. Don&rsquo;t just bung some graphs on a dashboard
+and call it monitoring</li>
+<li>Dashboards as documentation™. A well built dashboard can explain the
+architecture of your application.</li>
+<li>Page on user impact; alert on other things, just don&rsquo;t wake me up
+unless it&rsquo;s actually impacting the user.</li>
+<li>If the system is queue based, lag is probably a metric correlated with user
+impact.</li>
+<li>You can use tracer messages to monitor lag.</li>
+<li>If a metric changes randomly for no reason, it probably isn&rsquo;t useful.</li>
+</ol>
 
 <h1 id="stash-deferred">Stash Deferred</h1>
 
@@ -186,19 +219,20 @@ with their use.</p>
 
 <p>The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
-dimensions. In Qubit, we have a convention of having a label called result,
-which has two values: <code>success</code> and <code>failure</code>.</p>
+dimensions. In Qubit, we have a convention of having a label on this kind of
+counter called result, which has two values: <code>success</code> and <code>failure</code>.</p>
 
 <p>The second metric is the variable <code>kinesisWriteDuration</code>, registered as
 <code>stashdef_kinesis_message_write_duration_seconds</code>. Much the same as the above,
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
-exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
-exponent, and 6 being the number of buckets. This results roughly in buckets
-counting requests where the durations were between [0,0.1), [0.1,0.316..),
-[0.316..,1), etc etc. The use of <code>math.Sqrt(10)</code> gives us 2 buckets per order of
-magnitude, which is useful to cover a large range of possible durations when you
-don&rsquo;t know what the &lsquo;normal&rsquo; range for the operation is.</p>
+exponentially distributed buckets, with 0.1 being my starting bucket, root 10
+being my exponent, and 6 being the number of buckets. This results roughly in
+buckets counting requests where the durations were between [0,0.1),
+[0.1,0.316..), [0.316..,1), etc etc. The use of <code>math.Sqrt(10)</code> gives us
+2 buckets per order of magnitude, which is useful to cover a large range of
+possible durations when you don&rsquo;t know what the &lsquo;normal&rsquo; range for the
+operation is.</p>
 
 <p>The other change is in the name of the metric, where we exchange <code>total</code> for
 <code>duration_seconds</code>. Adding the unit to the metric name makes life easier for
@@ -206,7 +240,7 @@ everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
 where using seconds as a unit could cause issues is negligible.</p>
 
-<p>With our metric set up, we can now instrument our publishing code.</p>
+<p>With our metrics set up, we can now instrument our publishing code.</p>
 
 <pre><code class="language-go">func (k *KinesisWriter) Write(ctx context.Context, messageChan &lt;-chan Message, delchan chan&lt;- string) error {
   for {
@@ -236,8 +270,9 @@ where using seconds as a unit could cause issues is negligible.</p>
 }
 </code></pre>
 
-<p>Gripping stuff. I&rsquo;ve omitted some code that handles retries and suchlike. With
-this, we get some incredibly useful metrics. Let&rsquo;s play with them.</p>
+<p>Gripping stuff. I&rsquo;ve omitted some code that handles determining if an error is
+retryable and suchlike. With this, we get some incredibly useful metrics. Let&rsquo;s
+play with them.</p>
 
 <p>The first thing I&rsquo;d like to see is the throughput of my system. This is the rate
 of increase of the write count metric:</p>
@@ -245,11 +280,15 @@ of increase of the write count metric:</p>
 <pre><code class="language-rule">rate(stashdef_kinesis_message_write_total[1m])
 </code></pre>
 
-<p>As our metric is not a continuous function, we can&rsquo;t simply differentiate it, so
-we need to specify over what period we want our rate to be calculated. This is
-the period in the square brackets. 1m is a convention within Qubit, along with
-30m for when you want a calmer, PM friendly, view. In general, the smaller the
-window, the less data required, the faster the result.</p>
+<p>The <a href="https://prometheus.io/docs/querying/functions/#rate()"><code>rate</code> function</a>
+here takes the counter and works out the rate of increase, ignoring any times
+that the counter decreases (counters can only decrease when the program restarts
+and they are reset to 0). As our metric is not a continuous function, we can&rsquo;t
+simply differentiate it, so we need to specify over what period we want our rate
+to be calculated. This is the period in the square brackets. 1m is a convention
+within Qubit, along with 30m for when you want a calmer, PM friendly, view. The
+smaller the window, the less data required, the faster the result, so 1m is
+great for quick plots and dashboards.</p>
 
 <p>A general note about rates: it is statistically meaningless to compare two
 metrics that have been calculated using rates across different intervals. This
@@ -257,8 +296,8 @@ is why it is so important to develop strong conventions around rate intervals.
 Imagine a (contrived) situation where your ops team has calculated network
 traffic rates at the 5m interval and you have calculated row processing rate at
 the 30m interval. Any comparison between the two metrics now becomes a
-statistical minefield that would make Brian Brazil very unhappy if he learnt
-about it.</p>
+statistical minefield that would make <a href="https://www.youtube.com/watch?v=67Ulrq6DxwA">Brian Brazil very
+unhappy</a> if he learnt about it.</p>
 
 <p>When we graph this in the Prometheus UI, we get</p>
 
@@ -268,7 +307,7 @@ about it.</p>
 labels we have sent. In the graph&rsquo;s legend, we can see the set of labels that
 Prometheus has associated with our metrics. Many of them are generated by
 Prometheus based on the metadata attached to our application&rsquo;s deployment, but
-on the far right we can see the <code>result</code> metric. If we had more that one
+on the far right we can see the <code>result</code> label. If we had more that one
 instance of the application running, we would end up with more than 2 lines. To
 merge those lines together, we need to specify an aggregation method. In this
 case, as we are interested in the throughput of the system, we probably want to
@@ -279,6 +318,10 @@ second:</p>
 </code></pre>
 
 <p><img src="/imgs/stash-deferred/sum-rate-kinesis-write-total.png" alt="sum_kinesis message write rate" /></p>
+
+<p>Note: always sum rates, never rate sums. This is because Prometheus needs all
+the help it can get working out when a counter has reset, and rating sums means
+that resets will not show the metric going to 0, which is not so good.</p>
 
 <p>Realistically, the information we want on our Grafana dashboard is probably the
 overall success and error rates. We can do this by summing over a specific
@@ -294,17 +337,18 @@ label. This is similar to the <code>GROUP BY</code> statement in SQL:</p>
 <p>Beautiful. No errors! Let&rsquo;s take a look at our duration metrics next.</p>
 
 <p>With duration, we have no choice but to show a statistic, as a time series of
-a histogram is not particularly possible when we only have two dimensions. An
+a histogram is not particularly readable when we only have two dimensions. An
 easy to calculate statistic is the mean time the publish operation takes.</p>
 
 <pre><code class="language-rule">rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
   rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
 </code></pre>
 
-<p>However the mean is a widely discredited statistic in monitoring circles. Much
-preferred is the quantile. Prometheus allows us to calculate quantiles from
-histograms using the <a href="https://prometheus.io/docs/querying/functions/#histogram_quantile"><code>histogram_quantile</code>
-function</a>.</p>
+<p>However the mean is a <a href="https://landing.google.com/sre/book/chapters/monitoring-distributed-systems.html#worrying-about-your-tail-or-instrumentation-and-performance-Yms9Ck">widely
+discredited</a>
+statistic in monitoring circles. Much preferred is the quantile. Prometheus
+allows us to calculate (approximate) quantiles from histograms using the
+<a href="https://prometheus.io/docs/querying/functions/#histogram_quantile"><code>histogram_quantile</code> function</a>.</p>
 
 <pre><code class="language-rule">histogram_quantile(0.99,
   rate(stashdef_kinesis_message_write_duration_seconds_bucket[1m]))
@@ -326,7 +370,7 @@ result.</p>
 that we could apply to pretty much any operation in any program, and get some
 form of useful result.</p>
 
-<h2 id="slightly-interesting-monitoring">Slightly interesting monitoring</h2>
+<h1 id="slightly-interesting-monitoring">Slightly interesting monitoring</h1>
 
 <p>Is there anything more we need to measure about our program? There are a few
 things that this program does that verge on interesting, and we should probably
@@ -352,6 +396,7 @@ func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&lt;- Messag
   if b.IsActive(msg) {
     bigtableScanDuplicateCount.Inc()
   } else {
+    b.MakeActive(msg)
     select {
     case &lt;-ctx.Done():
       return ctx.Err()
@@ -367,7 +412,7 @@ that a row finish in, so having visibility of it is useful. I doubt I&rsquo;d ev
 alert on it, but I might graph it during an incident to see if anything funky
 was going on.</p>
 
-<h3 id="building-a-diagram">Building a diagram</h3>
+<h2 id="building-a-diagram">Building a diagram</h2>
 
 <p>With that metric, we now have visibility on every exit point of a row from our
 application. At Qubit we have a third party plugin installed in our Grafana,
@@ -403,20 +448,20 @@ by installing the diagram plugin and trying out it out.</p>
 
 <pre><code class="language-mermaid">graph LR
 subgraph stash
-W[User] ==&gt; S
+  W[User] ==&gt; S
 end
 
 S(Stash) ==&gt; A[BigTable]
 
 subgraph deferred-backend
-A ==&gt; B(BT Scaner)
-B --&gt; B1&gt;Duplicate]
-B --&gt; B2&gt;Error]
-B ==&gt; C(Kinesis Publisher)
-C --&gt; C1&gt;Error]
-C ==&gt; D(BT Deleter)
-D ==&gt; A
-D --&gt; D1&gt;Error]
+  A ==&gt; B(BT Scaner)
+  B --&gt; B1&gt;Duplicate]
+  B --&gt; B2&gt;Error]
+  B ==&gt; C(Kinesis Publisher)
+  C --&gt; C1&gt;Error]
+  C ==&gt; D(BT Deleter)
+  D ==&gt; A
+  D --&gt; D1&gt;Error]
 end
 C ==&gt; E[Kinesis]
 </code></pre>
@@ -440,11 +485,11 @@ would be much bigger than a square <code>Error</code>, suggesting to the user th
 more duplicates happening than errors.</li>
 </ol>
 
-<h3 id="top-users">Top users</h3>
+<h2 id="top-users">Top users</h2>
 
 <p>Nothing we&rsquo;ve done so far introspects the data coming through our system. One
-common question during an incident relating to volume is &lsquo;did someone start
-sending something new&rsquo;? We can add a metric to capture this.</p>
+common question during an incident relating to volume and capacity is &lsquo;did
+someone start sending something new&rsquo;? We can add a metric to capture this.</p>
 
 <pre><code class="language-go">var (
   kinesisDecodeCount = prometheus.NewCounterVec(
@@ -473,6 +518,9 @@ aggregation</a>.</p>
 </code></pre>
 
 <p><img src="/imgs/stash-deferred/topk-streams.png" alt="topk-streams" /></p>
+
+<p>I&rsquo;ve expertly photoshopped out the stream names, as they&rsquo;re a wee bit sensitive,
+but you get the picture.</p>
 
 <p>I&rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the re-added it. It&rsquo;s probably worth
@@ -576,6 +624,10 @@ the lag on that message. This looks like</p>
 <pre><code class="language-rule">(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 </code></pre>
 
+<p>The Prometheus <a href="https://prometheus.io/docs/querying/functions/#time()"><code>time()</code> function</a>
+returns the current unix epoch time in seconds. Because all Prometheus metrics
+are 64 bit floating point numbers, we still get subsecond granularity.</p>
+
 <p>We don’t just track the <code>stashdef_lag_seconds</code> as if the lag monitor were to
 fail, that metric would stop updating. The safest measure of lag is the lag
 measured by the lag monitor plus the time since we last measured that lag, as if
@@ -610,7 +662,10 @@ continuously calculate and store our lag, along with an alert on that lag
 calculation.  The alert syntax is a wee bit odd, but should read: the alert
 <code>StashDeferredLagHigh</code> will fire if the metric <code>job:stashdef_lag:seconds</code> is
 greater than 300 for 2 minutes. When it fires, it should send to the slack
-channel <code>stash-deferred</code>, with the following description [description omitted].</p>
+channel <code>stash-deferred</code>. The <code>description</code> annotations specifies what message
+the receivers of the alert will get. We&rsquo;ve used alertmanager&rsquo;s templating to
+inject the current value of the lag into the alert text. This templating works
+in any label or annotation, and can reference labels on the metrics also.</p>
 
 <p>The durations specified in the alert above are a bit arbitrary, and will be
 subject to tweaks over time. With the current setup, we can say that should the

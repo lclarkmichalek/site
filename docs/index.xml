@@ -17,6 +17,39 @@
       <guid>http://generictestdomain.net/post/monitoring-queue/</guid>
       <description>
 
+&lt;h1 id=&#34;how-to-monitor-queue-based-applications&#34;&gt;How to monitor: Queue based applications&lt;/h1&gt;
+
+&lt;p&gt;The state of the monitoring ecosystem nowadays is pretty amazing. There are tons
+of tools that make it easy to add metrics to your systems and alerts to your
+metrics. However, that&amp;rsquo;s not enough to actually get much value out of your
+monitoring. It just makes it possible to ask &amp;lsquo;what should I be monitoring&amp;rsquo; and
+&amp;lsquo;what should I be alerting&amp;rsquo;.&lt;/p&gt;
+
+&lt;p&gt;This post aims to go through a real service in production at Qubit, and the
+metrics and alerts on it. More importantly, it covers the rationale behind the
+decisions, and points out the various patterns that occur when implementing
+monitoring. Some of those patterns are general to almost any application, while
+others are specific to queue based applications. Regardless of if you regularly
+write or operate queue based applications, there should be some value somewhere
+in this.&lt;/p&gt;
+
+&lt;p&gt;However, this post is quite long, so I&amp;rsquo;ll try and sum it up:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;If you don&amp;rsquo;t know what to monitor about an operation monitor rate (split by
+success and failure) and duration.&lt;/li&gt;
+&lt;li&gt;Dashboards aren&amp;rsquo;t just for you. Don&amp;rsquo;t just bung some graphs on a dashboard
+and call it monitoring&lt;/li&gt;
+&lt;li&gt;Dashboards as documentation™. A well built dashboard can explain the
+architecture of your application.&lt;/li&gt;
+&lt;li&gt;Page on user impact; alert on other things, just don&amp;rsquo;t wake me up
+unless it&amp;rsquo;s actually impacting the user.&lt;/li&gt;
+&lt;li&gt;If the system is queue based, lag is probably a metric correlated with user
+impact.&lt;/li&gt;
+&lt;li&gt;You can use tracer messages to monitor lag.&lt;/li&gt;
+&lt;li&gt;If a metric changes randomly for no reason, it probably isn&amp;rsquo;t useful.&lt;/li&gt;
+&lt;/ol&gt;
+
 &lt;h1 id=&#34;stash-deferred&#34;&gt;Stash Deferred&lt;/h1&gt;
 
 &lt;p&gt;At Qubit, we have a service named &amp;lsquo;Stash Deferred&amp;rsquo;. It reads from a database,
@@ -96,19 +129,20 @@ with their use.&lt;/p&gt;
 
 &lt;p&gt;The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
-dimensions. In Qubit, we have a convention of having a label called result,
-which has two values: &lt;code&gt;success&lt;/code&gt; and &lt;code&gt;failure&lt;/code&gt;.&lt;/p&gt;
+dimensions. In Qubit, we have a convention of having a label on this kind of
+counter called result, which has two values: &lt;code&gt;success&lt;/code&gt; and &lt;code&gt;failure&lt;/code&gt;.&lt;/p&gt;
 
 &lt;p&gt;The second metric is the variable &lt;code&gt;kinesisWriteDuration&lt;/code&gt;, registered as
 &lt;code&gt;stashdef_kinesis_message_write_duration_seconds&lt;/code&gt;. Much the same as the above,
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
-exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
-exponent, and 6 being the number of buckets. This results roughly in buckets
-counting requests where the durations were between [0,0.1), [0.1,0.316..),
-[0.316..,1), etc etc. The use of &lt;code&gt;math.Sqrt(10)&lt;/code&gt; gives us 2 buckets per order of
-magnitude, which is useful to cover a large range of possible durations when you
-don&amp;rsquo;t know what the &amp;lsquo;normal&amp;rsquo; range for the operation is.&lt;/p&gt;
+exponentially distributed buckets, with 0.1 being my starting bucket, root 10
+being my exponent, and 6 being the number of buckets. This results roughly in
+buckets counting requests where the durations were between [0,0.1),
+[0.1,0.316..), [0.316..,1), etc etc. The use of &lt;code&gt;math.Sqrt(10)&lt;/code&gt; gives us
+2 buckets per order of magnitude, which is useful to cover a large range of
+possible durations when you don&amp;rsquo;t know what the &amp;lsquo;normal&amp;rsquo; range for the
+operation is.&lt;/p&gt;
 
 &lt;p&gt;The other change is in the name of the metric, where we exchange &lt;code&gt;total&lt;/code&gt; for
 &lt;code&gt;duration_seconds&lt;/code&gt;. Adding the unit to the metric name makes life easier for
@@ -116,7 +150,7 @@ everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
 where using seconds as a unit could cause issues is negligible.&lt;/p&gt;
 
-&lt;p&gt;With our metric set up, we can now instrument our publishing code.&lt;/p&gt;
+&lt;p&gt;With our metrics set up, we can now instrument our publishing code.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func (k *KinesisWriter) Write(ctx context.Context, messageChan &amp;lt;-chan Message, delchan chan&amp;lt;- string) error {
   for {
@@ -146,8 +180,9 @@ where using seconds as a unit could cause issues is negligible.&lt;/p&gt;
 }
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Gripping stuff. I&amp;rsquo;ve omitted some code that handles retries and suchlike. With
-this, we get some incredibly useful metrics. Let&amp;rsquo;s play with them.&lt;/p&gt;
+&lt;p&gt;Gripping stuff. I&amp;rsquo;ve omitted some code that handles determining if an error is
+retryable and suchlike. With this, we get some incredibly useful metrics. Let&amp;rsquo;s
+play with them.&lt;/p&gt;
 
 &lt;p&gt;The first thing I&amp;rsquo;d like to see is the throughput of my system. This is the rate
 of increase of the write count metric:&lt;/p&gt;
@@ -155,11 +190,15 @@ of increase of the write count metric:&lt;/p&gt;
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;rate(stashdef_kinesis_message_write_total[1m])
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;As our metric is not a continuous function, we can&amp;rsquo;t simply differentiate it, so
-we need to specify over what period we want our rate to be calculated. This is
-the period in the square brackets. 1m is a convention within Qubit, along with
-30m for when you want a calmer, PM friendly, view. In general, the smaller the
-window, the less data required, the faster the result.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;https://prometheus.io/docs/querying/functions/#rate()&#34;&gt;&lt;code&gt;rate&lt;/code&gt; function&lt;/a&gt;
+here takes the counter and works out the rate of increase, ignoring any times
+that the counter decreases (counters can only decrease when the program restarts
+and they are reset to 0). As our metric is not a continuous function, we can&amp;rsquo;t
+simply differentiate it, so we need to specify over what period we want our rate
+to be calculated. This is the period in the square brackets. 1m is a convention
+within Qubit, along with 30m for when you want a calmer, PM friendly, view. The
+smaller the window, the less data required, the faster the result, so 1m is
+great for quick plots and dashboards.&lt;/p&gt;
 
 &lt;p&gt;A general note about rates: it is statistically meaningless to compare two
 metrics that have been calculated using rates across different intervals. This
@@ -167,8 +206,8 @@ is why it is so important to develop strong conventions around rate intervals.
 Imagine a (contrived) situation where your ops team has calculated network
 traffic rates at the 5m interval and you have calculated row processing rate at
 the 30m interval. Any comparison between the two metrics now becomes a
-statistical minefield that would make Brian Brazil very unhappy if he learnt
-about it.&lt;/p&gt;
+statistical minefield that would make &lt;a href=&#34;https://www.youtube.com/watch?v=67Ulrq6DxwA&#34;&gt;Brian Brazil very
+unhappy&lt;/a&gt; if he learnt about it.&lt;/p&gt;
 
 &lt;p&gt;When we graph this in the Prometheus UI, we get&lt;/p&gt;
 
@@ -178,7 +217,7 @@ about it.&lt;/p&gt;
 labels we have sent. In the graph&amp;rsquo;s legend, we can see the set of labels that
 Prometheus has associated with our metrics. Many of them are generated by
 Prometheus based on the metadata attached to our application&amp;rsquo;s deployment, but
-on the far right we can see the &lt;code&gt;result&lt;/code&gt; metric. If we had more that one
+on the far right we can see the &lt;code&gt;result&lt;/code&gt; label. If we had more that one
 instance of the application running, we would end up with more than 2 lines. To
 merge those lines together, we need to specify an aggregation method. In this
 case, as we are interested in the throughput of the system, we probably want to
@@ -189,6 +228,10 @@ second:&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/sum-rate-kinesis-write-total.png&#34; alt=&#34;sum_kinesis message write rate&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Note: always sum rates, never rate sums. This is because Prometheus needs all
+the help it can get working out when a counter has reset, and rating sums means
+that resets will not show the metric going to 0, which is not so good.&lt;/p&gt;
 
 &lt;p&gt;Realistically, the information we want on our Grafana dashboard is probably the
 overall success and error rates. We can do this by summing over a specific
@@ -204,17 +247,18 @@ label. This is similar to the &lt;code&gt;GROUP BY&lt;/code&gt; statement in SQL
 &lt;p&gt;Beautiful. No errors! Let&amp;rsquo;s take a look at our duration metrics next.&lt;/p&gt;
 
 &lt;p&gt;With duration, we have no choice but to show a statistic, as a time series of
-a histogram is not particularly possible when we only have two dimensions. An
+a histogram is not particularly readable when we only have two dimensions. An
 easy to calculate statistic is the mean time the publish operation takes.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;rate(stashdef_kinesis_message_write_duration_seconds_sum[1m]) /
   rate(stashdef_kinesis_message_write_duration_seconds_count[1m])
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;However the mean is a widely discredited statistic in monitoring circles. Much
-preferred is the quantile. Prometheus allows us to calculate quantiles from
-histograms using the &lt;a href=&#34;https://prometheus.io/docs/querying/functions/#histogram_quantile&#34;&gt;&lt;code&gt;histogram_quantile&lt;/code&gt;
-function&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;However the mean is a &lt;a href=&#34;https://landing.google.com/sre/book/chapters/monitoring-distributed-systems.html#worrying-about-your-tail-or-instrumentation-and-performance-Yms9Ck&#34;&gt;widely
+discredited&lt;/a&gt;
+statistic in monitoring circles. Much preferred is the quantile. Prometheus
+allows us to calculate (approximate) quantiles from histograms using the
+&lt;a href=&#34;https://prometheus.io/docs/querying/functions/#histogram_quantile&#34;&gt;&lt;code&gt;histogram_quantile&lt;/code&gt; function&lt;/a&gt;.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;histogram_quantile(0.99,
   rate(stashdef_kinesis_message_write_duration_seconds_bucket[1m]))
@@ -236,7 +280,7 @@ result.&lt;/p&gt;
 that we could apply to pretty much any operation in any program, and get some
 form of useful result.&lt;/p&gt;
 
-&lt;h2 id=&#34;slightly-interesting-monitoring&#34;&gt;Slightly interesting monitoring&lt;/h2&gt;
+&lt;h1 id=&#34;slightly-interesting-monitoring&#34;&gt;Slightly interesting monitoring&lt;/h1&gt;
 
 &lt;p&gt;Is there anything more we need to measure about our program? There are a few
 things that this program does that verge on interesting, and we should probably
@@ -262,6 +306,7 @@ func (b *BigtableScanner) Scan(ctx context.Context, messageChan chan&amp;lt;- Me
   if b.IsActive(msg) {
     bigtableScanDuplicateCount.Inc()
   } else {
+    b.MakeActive(msg)
     select {
     case &amp;lt;-ctx.Done():
       return ctx.Err()
@@ -277,7 +322,7 @@ that a row finish in, so having visibility of it is useful. I doubt I&amp;rsquo;
 alert on it, but I might graph it during an incident to see if anything funky
 was going on.&lt;/p&gt;
 
-&lt;h3 id=&#34;building-a-diagram&#34;&gt;Building a diagram&lt;/h3&gt;
+&lt;h2 id=&#34;building-a-diagram&#34;&gt;Building a diagram&lt;/h2&gt;
 
 &lt;p&gt;With that metric, we now have visibility on every exit point of a row from our
 application. At Qubit we have a third party plugin installed in our Grafana,
@@ -313,20 +358,20 @@ by installing the diagram plugin and trying out it out.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-mermaid&#34;&gt;graph LR
 subgraph stash
-W[User] ==&amp;gt; S
+  W[User] ==&amp;gt; S
 end
 
 S(Stash) ==&amp;gt; A[BigTable]
 
 subgraph deferred-backend
-A ==&amp;gt; B(BT Scaner)
-B --&amp;gt; B1&amp;gt;Duplicate]
-B --&amp;gt; B2&amp;gt;Error]
-B ==&amp;gt; C(Kinesis Publisher)
-C --&amp;gt; C1&amp;gt;Error]
-C ==&amp;gt; D(BT Deleter)
-D ==&amp;gt; A
-D --&amp;gt; D1&amp;gt;Error]
+  A ==&amp;gt; B(BT Scaner)
+  B --&amp;gt; B1&amp;gt;Duplicate]
+  B --&amp;gt; B2&amp;gt;Error]
+  B ==&amp;gt; C(Kinesis Publisher)
+  C --&amp;gt; C1&amp;gt;Error]
+  C ==&amp;gt; D(BT Deleter)
+  D ==&amp;gt; A
+  D --&amp;gt; D1&amp;gt;Error]
 end
 C ==&amp;gt; E[Kinesis]
 &lt;/code&gt;&lt;/pre&gt;
@@ -350,11 +395,11 @@ would be much bigger than a square &lt;code&gt;Error&lt;/code&gt;, suggesting to
 more duplicates happening than errors.&lt;/li&gt;
 &lt;/ol&gt;
 
-&lt;h3 id=&#34;top-users&#34;&gt;Top users&lt;/h3&gt;
+&lt;h2 id=&#34;top-users&#34;&gt;Top users&lt;/h2&gt;
 
 &lt;p&gt;Nothing we&amp;rsquo;ve done so far introspects the data coming through our system. One
-common question during an incident relating to volume is &amp;lsquo;did someone start
-sending something new&amp;rsquo;? We can add a metric to capture this.&lt;/p&gt;
+common question during an incident relating to volume and capacity is &amp;lsquo;did
+someone start sending something new&amp;rsquo;? We can add a metric to capture this.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var (
   kinesisDecodeCount = prometheus.NewCounterVec(
@@ -383,6 +428,9 @@ aggregation&lt;/a&gt;.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/topk-streams.png&#34; alt=&#34;topk-streams&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;ve expertly photoshopped out the stream names, as they&amp;rsquo;re a wee bit sensitive,
+but you get the picture.&lt;/p&gt;
 
 &lt;p&gt;I&amp;rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
 displayed this metric, then removed it, and the re-added it. It&amp;rsquo;s probably worth
@@ -486,6 +534,10 @@ the lag on that message. This looks like&lt;/p&gt;
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 &lt;/code&gt;&lt;/pre&gt;
 
+&lt;p&gt;The Prometheus &lt;a href=&#34;https://prometheus.io/docs/querying/functions/#time()&#34;&gt;&lt;code&gt;time()&lt;/code&gt; function&lt;/a&gt;
+returns the current unix epoch time in seconds. Because all Prometheus metrics
+are 64 bit floating point numbers, we still get subsecond granularity.&lt;/p&gt;
+
 &lt;p&gt;We don’t just track the &lt;code&gt;stashdef_lag_seconds&lt;/code&gt; as if the lag monitor were to
 fail, that metric would stop updating. The safest measure of lag is the lag
 measured by the lag monitor plus the time since we last measured that lag, as if
@@ -520,7 +572,10 @@ continuously calculate and store our lag, along with an alert on that lag
 calculation.  The alert syntax is a wee bit odd, but should read: the alert
 &lt;code&gt;StashDeferredLagHigh&lt;/code&gt; will fire if the metric &lt;code&gt;job:stashdef_lag:seconds&lt;/code&gt; is
 greater than 300 for 2 minutes. When it fires, it should send to the slack
-channel &lt;code&gt;stash-deferred&lt;/code&gt;, with the following description [description omitted].&lt;/p&gt;
+channel &lt;code&gt;stash-deferred&lt;/code&gt;. The &lt;code&gt;description&lt;/code&gt; annotations specifies what message
+the receivers of the alert will get. We&amp;rsquo;ve used alertmanager&amp;rsquo;s templating to
+inject the current value of the lag into the alert text. This templating works
+in any label or annotation, and can reference labels on the metrics also.&lt;/p&gt;
 
 &lt;p&gt;The durations specified in the alert above are a bit arbitrary, and will be
 subject to tweaks over time. With the current setup, we can say that should the

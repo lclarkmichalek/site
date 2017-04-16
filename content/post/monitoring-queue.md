@@ -224,7 +224,7 @@ Putting that on our dashboard, we get
 Beautiful. No errors! Let's take a look at our duration metrics next.
 
 With duration, we have no choice but to show a statistic, as a time series of
-a histogram is not particularly possible when we only have two dimensions. An
+a histogram is not particularly readable when we only have two dimensions. An
 easy to calculate statistic is the mean time the publish operation takes.
 
 ```rule

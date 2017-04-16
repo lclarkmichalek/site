@@ -5,3 +5,7 @@
 code.language-rule, code.language-mermaid {
   background-color: rgba(0, 0, 0, 0) !important;
 }
+
+#post-body ol {
+  margin-bottom: 15px;
+}

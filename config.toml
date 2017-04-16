@@ -9,7 +9,7 @@ googleAnalytics = "UA-25243984-2"
 # Disable comments by leaving disqusShortname empty
 disqusShortname = ""
 
-destination = "./docs"
+publishDir = "./docs"
 
 [params]
 	name = "Laurie Clark-Michalek"

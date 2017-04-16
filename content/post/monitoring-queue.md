@@ -109,12 +109,13 @@ The second metric is the variable `kinesisWriteDuration`, registered as
 `stashdef_kinesis_message_write_duration_seconds`. Much the same as the above,
 the key differences are that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
-exponentially distributed buckets, with 0.1 being my starting bucket, 3 being my
-exponent, and 6 being the number of buckets. This results roughly in buckets
-counting requests where the durations were between [0,0.1), [0.1,0.316..),
-[0.316..,1), etc etc. The use of `math.Sqrt(10)` gives us 2 buckets per order of
-magnitude, which is useful to cover a large range of possible durations when you
-don't know what the 'normal' range for the operation is.
+exponentially distributed buckets, with 0.1 being my starting bucket, root 10
+being my exponent, and 6 being the number of buckets. This results roughly in
+buckets counting requests where the durations were between [0,0.1),
+[0.1,0.316..), [0.316..,1), etc etc. The use of `math.Sqrt(10)` gives us
+2 buckets per order of magnitude, which is useful to cover a large range of
+possible durations when you don't know what the 'normal' range for the
+operation is.
 
 The other change is in the name of the metric, where we exchange `total` for
 `duration_seconds`. Adding the unit to the metric name makes life easier for

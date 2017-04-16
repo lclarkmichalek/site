@@ -24,18 +24,19 @@ in this.
 
 However, this post is quite long, so I'll try and sum it up:
 
-1. If you don't know what to monitor about an operation monitor rate (split by
-   success and failure) and duration.
-2. Dashboards aren't just for you. Don't just bung some graphs on a dashboard
-   and call it monitoring
+1. If you don't know what to monitor about an operation, monitor duration, rate
+   of success, and rate of failure.
+2. Dashboards need to be understood by other people. Don't just bung some graphs
+   on a dashboard and call it monitoring
 3. Dashboards as documentation™. A well built dashboard can explain the
-   architecture of your application.
+   architecture of your application. Diagrams are great for this.
 4. Page on user impact; alert on other things, just don't wake me up
    unless it's actually impacting the user.
 5. If the system is queue based, lag is probably a metric correlated with user
    impact.
 6. You can use tracer messages to monitor lag.
-7. If a metric changes randomly for no reason, it probably isn't useful.
+7. If a metric changes and you don't know why it changed, or what that implies
+   about the system, it probably isn't useful.
 
 # Stash Deferred
 
@@ -610,5 +611,7 @@ The additions made here are:
 In the future, as I gain more experience operating this service, I plan to
 demote some of the duration metrics to below the fold on this dashboard, as they
 seem to be subject to seemingly alarming changes under completely normal
-operation. I also hope to spend some time addressing dropped messages in a more
-holistic manner in the lag monitor component.
+operation (I have a theory relating to tablet merging in BigTable, but even
+then, if that knowledge is not available in the dashboard, the graph is
+misleading). I also hope to spend some time addressing dropped messages in a
+more holistic manner in the lag monitor component.

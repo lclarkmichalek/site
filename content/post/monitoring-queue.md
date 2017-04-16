@@ -604,7 +604,8 @@ The additions made here are:
 1. The Bigtable deletion rate graph. Failed Bigtable deletions can result in
    duplicate messages, so we prioritise this metric.
 2. Component memory usage. This is a metric fetched from the Kubernetes cluster,
-   and is mostly there so I can say 'look how efficient it is!'
+   and is mostly there so I can say 'look how efficient it is!'. It also shows
+   component restarts well, which is very useful during incidents.
 
 In the future, as I gain more experience operating this service, I plan to
 demote some of the duration metrics to below the fold on this dashboard, as they

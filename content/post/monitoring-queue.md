@@ -205,6 +205,10 @@ sum(rate(stashdef_kinesis_message_write_total[1m]))
 
 ![sum_kinesis message write rate](/imgs/stash-deferred/sum-rate-kinesis-write-total.png)
 
+Note: always sum rates, never rate sums. This is because Prometheus needs all
+the help it can get working out when a counter has reset, and rating sums means
+that resets will not show the metric going to 0, which is not so good.
+
 Realistically, the information we want on our Grafana dashboard is probably the
 overall success and error rates. We can do this by summing over a specific
 label. This is similar to the `GROUP BY` statement in SQL:

@@ -50,7 +50,7 @@ This post aims to go through a real service in production at Qubit, and the metr
 
 
 <meta itemprop="dateModified" content="2017-04-01T21:13:56&#43;01:00" />
-<meta itemprop="wordCount" content="3730">
+<meta itemprop="wordCount" content="3742">
 
 
 
@@ -694,7 +694,8 @@ post are actually of recording rules, not the &lsquo;raw&rsquo; queries.</p>
 <li>The Bigtable deletion rate graph. Failed Bigtable deletions can result in
 duplicate messages, so we prioritise this metric.</li>
 <li>Component memory usage. This is a metric fetched from the Kubernetes cluster,
-and is mostly there so I can say &lsquo;look how efficient it is!&rsquo;</li>
+and is mostly there so I can say &lsquo;look how efficient it is!&rsquo;. It also shows
+component restarts well, which is very useful during incidents.</li>
 </ol>
 
 <p>In the future, as I gain more experience operating this service, I plan to

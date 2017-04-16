@@ -604,7 +604,8 @@ post are actually of recording rules, not the &amp;lsquo;raw&amp;rsquo; queries.
 &lt;li&gt;The Bigtable deletion rate graph. Failed Bigtable deletions can result in
 duplicate messages, so we prioritise this metric.&lt;/li&gt;
 &lt;li&gt;Component memory usage. This is a metric fetched from the Kubernetes cluster,
-and is mostly there so I can say &amp;lsquo;look how efficient it is!&amp;rsquo;&lt;/li&gt;
+and is mostly there so I can say &amp;lsquo;look how efficient it is!&amp;rsquo;. It also shows
+component restarts well, which is very useful during incidents.&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;p&gt;In the future, as I gain more experience operating this service, I plan to

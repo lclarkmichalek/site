@@ -22,7 +22,22 @@ others are specific to queue based applications. Regardless of if you regularly
 write or operate queue based applications, there should be some value somewhere
 in this.
 
-## Stash Deferred
+However, this post is quite long, so I'll try and sum it up:
+
+1. If you don't know what to monitor about an operation monitor rate (split by
+   success and failure) and duration.
+2. Dashboards aren't just for you. Don't just bung some graphs on a dashboard
+   and call it monitoring
+3. Dashboards as documentation™. A well built dashboard can explain the
+   architecture of your application.
+4. Page on user impact; alert on other things, just don't wake me up
+   unless it's actually impacting the user.
+5. If the system is queue based, lag is probably a metric correlated with user
+   impact.
+6. You can use tracer messages to monitor lag.
+7. If a metric changes randomly for no reason, it probably isn't useful.
+
+# Stash Deferred
 
 At Qubit, we have a service named 'Stash Deferred'. It reads from a database,
 [GCP's Cloud Bigtable](https://cloud.google.com/bigtable/), and writes to
@@ -302,7 +317,7 @@ that a row finish in, so having visibility of it is useful. I doubt I'd ever
 alert on it, but I might graph it during an incident to see if anything funky
 was going on.
 
-### Building a diagram
+## Building a diagram
 
 With that metric, we now have visibility on every exit point of a row from our
 application. At Qubit we have a third party plugin installed in our Grafana,
@@ -374,7 +389,7 @@ General notes on the diagram plugin:
    would be much bigger than a square `Error`, suggesting to the user there are
    more duplicates happening than errors.
 
-### Top users
+## Top users
 
 Nothing we've done so far introspects the data coming through our system. One
 common question during an incident relating to volume is 'did someone start

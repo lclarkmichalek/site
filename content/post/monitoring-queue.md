@@ -507,7 +507,7 @@ const (
 I'm going to omit the code that writes to these metrics, as it's fairly involved
 in talking to the frontend of the service, though it looks a little like.
 
-```
+```go
 func sender(...) {
   for time.Tick(interval) {
     sendMessage(time.Now())

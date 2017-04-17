@@ -50,7 +50,7 @@ This post aims to go through a real service in production at Qubit, and the metr
 
 
 <meta itemprop="dateModified" content="2017-04-01T21:13:56&#43;01:00" />
-<meta itemprop="wordCount" content="3786">
+<meta itemprop="wordCount" content="3783">
 
 
 
@@ -599,7 +599,7 @@ comes through. This exposes two main metrics</p>
 <p>I&rsquo;m going to omit the code that writes to these metrics, as it&rsquo;s fairly involved
 in talking to the frontend of the service, though it looks a little like.</p>
 
-<pre><code>func sender(...) {
+<pre><code class="language-go">func sender(...) {
   for time.Tick(interval) {
     sendMessage(time.Now())
   }
@@ -625,10 +625,6 @@ the lag on that message. This looks like</p>
 <pre><code class="language-rule">(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
 </code></pre>
 
-<p>The Prometheus <a href="https://prometheus.io/docs/querying/functions/#time()"><code>time()</code> function</a>
-returns the current unix epoch time in seconds. Because all Prometheus metrics
-are 64 bit floating point numbers, we still get subsecond granularity.</p>
-
 <p>We don’t just track the <code>stashdef_lag_seconds</code> as if the lag monitor were to
 fail, that metric would stop updating. The safest measure of lag is the lag
 measured by the lag monitor plus the time since we last measured that lag, as if
@@ -640,7 +636,9 @@ regardless.</p>
 <p>The spiky nature of this graph comes from our use of Prometheus&rsquo;s
 <a href="https://prometheus.io/docs/querying/functions/#time()"><code>time</code> function</a>,
 which steadily increases, while the last received metric resets every time we get
-a message.</p>
+a message. <code>time()</code> returns the current unix epoch time in seconds. Because all
+Prometheus metrics are 64 bit floating point numbers, we still get subsecond
+granularity.</p>
 
 <p>This is the metric I want to alert on. Let&rsquo;s write a Prometheus alert on this</p>
 
@@ -673,7 +671,7 @@ subject to tweaks over time. With the current setup, we can say that should the
 process stop processing messages altogether, it will take 4 minutes before the
 metric is above 300 seconds (i.e. 5 minutes of lag), and then another 2 minutes
 before the alert will fire. This is perfectly acceptable for this system. Your
-system may have very different users who rely on a different guarentees.</p>
+system may have very different users who rely on a different guarantees.</p>
 
 <p>The Slack integration is set up in our
 <a href="https://github.com/prometheus/alertmanager">alertmanager</a> config. I&rsquo;d really

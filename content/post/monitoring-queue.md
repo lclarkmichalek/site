@@ -582,7 +582,7 @@ subject to tweaks over time. With the current setup, we can say that should the
 process stop processing messages altogether, it will take 4 minutes before the
 metric is above 300 seconds (i.e. 5 minutes of lag), and then another 2 minutes
 before the alert will fire. This is perfectly acceptable for this system. Your
-system may have very different users who rely on a different guarentees.
+system may have very different users who rely on a different guarantees.
 
 The Slack integration is set up in our
 [alertmanager](https://github.com/prometheus/alertmanager) config. I'd really

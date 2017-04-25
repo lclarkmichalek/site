@@ -140,6 +140,18 @@ everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
 where using seconds as a unit could cause issues is negligible.
 
+There is one step missing here; registering the metrics with the Prometheus
+client. This can be done using `prometheus.MustRegister`:
+
+```go
+func init() {
+  prometheus.MustRegister(kinesisWriteCount)
+  prometheus.MustRegister(kinesisWriteDuration)
+}
+```
+
+I'll omit this step in future for the sake of brevity.
+
 With our metrics set up, we can now instrument our publishing code.
 
 ```go

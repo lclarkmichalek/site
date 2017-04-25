@@ -549,7 +549,9 @@ The spiky nature of this graph comes from our use of Prometheus's
 which steadily increases, while the last received metric resets every time we get
 a message. `time()` returns the current unix epoch time in seconds. Because all
 Prometheus metrics are 64 bit floating point numbers, we still get subsecond
-granularity.
+granularity, though our `stashdef_heartbeat_timestamp_seconds` reports integers,
+causing even more spikeyness. However, the metric stays in the range of 40 to 60
+seconds, which is what we expect.
 
 This is the metric I want to alert on. Let's write a Prometheus alert on this
 

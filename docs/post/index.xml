@@ -25,7 +25,7 @@ metrics. However, that&amp;rsquo;s not enough to actually get much value out of 
 monitoring. It just makes it possible to ask &amp;lsquo;what should I be monitoring&amp;rsquo; and
 &amp;lsquo;what should I be alerting&amp;rsquo;.&lt;/p&gt;
 
-&lt;p&gt;This post aims to go through a real service in production at Qubit, and the
+&lt;p&gt;This post aims to go through a real service in production at Qubit and the
 metrics and alerts on it. More importantly, it covers the rationale behind the
 decisions, and points out the various patterns that occur when implementing
 monitoring. Some of those patterns are general to almost any application, while
@@ -33,7 +33,7 @@ others are specific to queue based applications. Regardless of if you regularly
 write or operate queue based applications, there should be some value somewhere
 in this.&lt;/p&gt;
 
-&lt;p&gt;However, this post is quite long, so I&amp;rsquo;ll try and sum it up:&lt;/p&gt;
+&lt;p&gt;However, this post is quite long, so I&amp;rsquo;ll try to sum it up:&lt;/p&gt;
 
 &lt;ol&gt;
 &lt;li&gt;If you don&amp;rsquo;t know what to monitor about an operation, monitor duration, rate
@@ -55,18 +55,18 @@ about the system, it probably isn&amp;rsquo;t useful.&lt;/li&gt;
 
 &lt;p&gt;At Qubit, we have a service named &amp;lsquo;Stash Deferred&amp;rsquo;. It reads from a database,
 &lt;a href=&#34;https://cloud.google.com/bigtable/&#34;&gt;GCP&amp;rsquo;s Cloud Bigtable&lt;/a&gt;, and writes to
-&lt;a href=&#34;https://aws.amazon.com/kinesis/streams/&#34;&gt;AWS&amp;rsquo;s Kinesis&lt;/a&gt;. Recently it underwent
-a bit of a renovation by the team that I am on, and a colleague commented that
-the end result had quite good monitoring, potentially worth of being a case
+&lt;a href=&#34;https://aws.amazon.com/kinesis/streams/&#34;&gt;AWS&amp;rsquo;s Kinesis&lt;/a&gt;. Recently the team
+that I am on renovated it a bit, and a colleague commented that
+the end result had quite good monitoring potentially worth of being a case
 study. So here&amp;rsquo;s that.&lt;/p&gt;
 
 &lt;p&gt;Stash Deferred is a system for deferring message writes. A user sends, via a
-HTTP call, a message, and an expiry timestamp. When the expiry time is reached,
+HTTP call, a message and an expiry timestamp. When the expiry time is reached,
 the message is put onto the Kinesis queue. There is no guarantee of ordering
 given.&lt;/p&gt;
 
-&lt;p&gt;Bigtable is a key value store that supports &amp;lsquo;get&amp;rsquo;, &amp;lsquo;set&amp;rsquo;, &amp;lsquo;delete&amp;rsquo; and &amp;lsquo;scan&amp;rsquo;.
-Scan allows you to request values between two keys, in lexicographical
+&lt;p&gt;Bigtable is a key value store that supports &amp;lsquo;get&amp;rsquo;, &amp;lsquo;set&amp;rsquo;, &amp;lsquo;delete&amp;rsquo;, and &amp;lsquo;scan&amp;rsquo;.
+Scan allows you to request values between two keys in lexicographical
 (alphabetical) order. This is the operation that Stash Deferred uses to fetch
 messages that should be sent. Every interval we send a request for all of the
 values with keys between &lt;code&gt;deferred:&lt;/code&gt; and &lt;code&gt;deferred:&amp;lt;current unix timestamp&amp;gt;&lt;/code&gt;.
@@ -135,8 +135,8 @@ the convention in the broader community, where having a seperate metric for
 successes and failures is popular, but it&amp;rsquo;s what we do at Qubit.&lt;/p&gt;
 
 &lt;p&gt;The second metric is the variable &lt;code&gt;kinesisWriteDuration&lt;/code&gt;, registered as
-&lt;code&gt;stashdef_kinesis_message_write_duration_seconds&lt;/code&gt;. Much the same as the above,
-the key differences are that this is a histogram. A histogram is made up of a
+&lt;code&gt;stashdef_kinesis_message_write_duration_seconds&lt;/code&gt;. This is much the same as the
+above; the key difference is that this is a histogram. A histogram is made up of a
 number of counters, each representing a different bucket. Here I set up a set of
 exponentially distributed buckets, with 0.1 being my starting bucket, root 10
 being my exponent, and 6 being the number of buckets. This results roughly in
@@ -209,7 +209,7 @@ that the counter decreases (counters can only decrease when the program restarts
 and they are reset to 0). As our metric is not a continuous function, we can&amp;rsquo;t
 simply differentiate it, so we need to specify over what period we want our rate
 to be calculated. This is the period in the square brackets. 1m is a convention
-within Qubit, along with 30m for when you want a calmer, PM friendly, view. The
+within Qubit, along with 30m for when you want a calmer PM &amp;emdash; friendly view. The
 smaller the window, the less data required, the faster the result, so 1m is
 great for quick plots and dashboards.&lt;/p&gt;
 
@@ -253,9 +253,8 @@ label. This is similar to the &lt;code&gt;GROUP BY&lt;/code&gt; statement in SQL
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;sum(rate(stashdef_kinesis_message_write_total[1m])) by (result)
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Putting that on our dashboard, we get&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/sum-rate-kinesis-write-result.png&#34; alt=&#34;sum-rate-kinesis-write-result&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Putting that on our dashboard, we get
+&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/sum-rate-kinesis-write-result.png&#34; alt=&#34;sum-rate-kinesis-write-result&#34; /&gt;&lt;/p&gt;
 
 &lt;p&gt;Beautiful. No errors! Let&amp;rsquo;s take a look at our duration metrics next.&lt;/p&gt;
 
@@ -290,7 +289,7 @@ result.&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/quantiles-rate-kinesis-write-duration.png&#34; alt=&#34;sum-rate-kinesis-write-result&#34; /&gt;&lt;/p&gt;
 
 &lt;p&gt;And now repeat for the other two operations. We now have basic instrumentation
-that we could apply to pretty much any operation in any program, and get some
+that we could apply to pretty much any operation in any program and get some
 form of useful result.&lt;/p&gt;
 
 &lt;h1 id=&#34;slightly-interesting-monitoring&#34;&gt;Slightly interesting monitoring&lt;/h1&gt;
@@ -342,8 +341,8 @@ application. At Qubit we have a third party plugin installed in our Grafana,
 &lt;a href=&#34;https://grafana.qutics.com/plugins/jdbranham-diagram-panel/edit&#34;&gt;jdbranham&amp;rsquo;s diagram
 plugin&lt;/a&gt;. It
 lets you create diagrams using &lt;a href=&#34;https://knsv.github.io/mermaid/&#34;&gt;Mermaid&lt;/a&gt;
-syntax, and then annotate them and style them based on the value of metrics.
-This allows you to produce something like this.&lt;/p&gt;
+syntax and then annotate and style them based on the value of metrics.
+This allows you to produce something like this:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/diagram-rate1m.png&#34; alt=&#34;diagram-rate1m&#34; /&gt;&lt;/p&gt;
 
@@ -362,8 +361,8 @@ between some metrics on a page and an actual dashboard. The diagram is just
 another tool in that direction.&lt;/p&gt;
 
 &lt;p&gt;The diagram plugin takes two main set of inputs. The first is the Mermaid
-specification for the diagram, and the second is the mapping from node on the
-diagram to metric.&lt;/p&gt;
+specification for the diagram, and the second is the mapping from nodes on the
+diagram to metrics.&lt;/p&gt;
 
 &lt;p&gt;The Mermaid specification for the above graph is provided below. It&amp;rsquo;s pretty
 incomprehensible, and the only way you&amp;rsquo;ll get any value out of this section is
@@ -412,7 +411,7 @@ more duplicates happening than errors.&lt;/li&gt;
 
 &lt;p&gt;Nothing we&amp;rsquo;ve done so far introspects the data coming through our system. One
 common question during an incident relating to volume and capacity is &amp;lsquo;did
-someone start sending something new&amp;rsquo;? We can add a metric to capture this.&lt;/p&gt;
+someone start sending something new?&amp;rsquo; We can add a metric to capture this.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var (
   kinesisDecodeCount = prometheus.NewCounterVec(
@@ -430,7 +429,7 @@ we are publishing the messages to.&lt;/p&gt;
 
 &lt;p&gt;Now, there are issues with this, the primary being that the values of &lt;code&gt;stream&lt;/code&gt;
 are unbounded. Prometheus scales primarily with the number of metrics, and each
-new value of &lt;code&gt;stream&lt;/code&gt; creates a new metrics. However, in our situation, we are
+new value of &lt;code&gt;stream&lt;/code&gt; creates a new metric. However, in our situation, we are
 only creating a single metric per &lt;code&gt;stream&lt;/code&gt; value, and the value of being able to
 see different stream names is greater than the risks involved. When we graph
 this, we probably only care about the top few streams. For this, we can use
@@ -446,7 +445,7 @@ aggregation&lt;/a&gt;.&lt;/p&gt;
 but you get the picture.&lt;/p&gt;
 
 &lt;p&gt;I&amp;rsquo;m never 100% sure if this is worth it. There have been dashboards where I have
-displayed this metric, then removed it, and the re-added it. It&amp;rsquo;s probably worth
+displayed this metric, then removed it, and then re-added it. It&amp;rsquo;s probably worth
 having, but looking at it for too long will turn it into a vanity metric.&lt;/p&gt;
 
 &lt;h3 id=&#34;backpressure&#34;&gt;Backpressure&lt;/h3&gt;
@@ -455,8 +454,8 @@ having, but looking at it for too long will turn it into a vanity metric.&lt;/p&
 However, it&amp;rsquo;s perfectly possible that the Kinesis publisher could become very
 slow, or that the Bigtable deleter could slow down. As the channels between the
 components are unbuffered, a slowdown upstream should cause the send on the
-channel to slow down, and by measuring this, we can get a sense of it there is a
-non scanner slowdown. Implementing this is easy enough.&lt;/p&gt;
+channel to slow down, and by measuring this, we can get a sense of if there is a
+non &amp;emdash; scanner slowdown. Implementing this is easy enough.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var (
   bigtableScanBackpressure = prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -498,13 +497,13 @@ be in the 100s of milliseconds.&lt;/p&gt;
 for an alert being pagable is user impact, and everything we&amp;rsquo;ve talked is very
 much a cause, not a symptom. To work out what we want to page on, we need to
 think about what happens when our system fails, and what do our users
-experience. In this case, there are two main symptoms; message lag and message
+experience. In this case, there are two main symptoms: message lag and message
 drops.&lt;/p&gt;
 
 &lt;p&gt;To measure these, we have a completely separate application. This application (I
 call it &lt;code&gt;lag-monitor&lt;/code&gt;) periodically sends messages with very short expiry, and
 then listens to the destination queue to see how long it takes before a message
-comes through. This exposes two main metrics&lt;/p&gt;
+comes through. This exposes two main metrics:&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;const (
   stashDeferredHeartbeatTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -515,7 +514,7 @@ comes through. This exposes two main metrics&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;I&amp;rsquo;m going to omit the code that writes to these metrics, as it&amp;rsquo;s fairly involved
-in talking to the frontend of the service, though it looks a little like.&lt;/p&gt;
+in talking to the frontend of the service, though it looks a little like this:&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func sender(...) {
   for time.Tick(interval) {
@@ -529,7 +528,7 @@ func receiver(...) {
 }
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Notably, this monitors more than just the Stash Deferred service, it also
+&lt;p&gt;Notably, this monitors more than just the Stash Deferred service. It also
 monitors the service that inserts messages into the BigTable database. You could
 question whether this really constitutes monitoring for this service, but if the
 frontend goes down, then my service&amp;rsquo;s users are affected, so I want to know when
@@ -576,7 +575,7 @@ greater than 300 for 2 minutes. When it fires, it should send to the slack
 channel &lt;code&gt;stash-deferred&lt;/code&gt;. The &lt;code&gt;description&lt;/code&gt; annotations specifies what message
 the receivers of the alert will get. We&amp;rsquo;ve used alertmanager&amp;rsquo;s templating to
 inject the current value of the lag into the alert text. This templating works
-in any label or annotation, and can reference labels on the metrics also.&lt;/p&gt;
+in any label or annotation, and can reference labels on the metrics as well.&lt;/p&gt;
 
 &lt;p&gt;The durations specified in the alert above are a bit arbitrary, and will be
 subject to tweaks over time. With the current setup, we can say that should the
@@ -618,7 +617,7 @@ the space for some more useful metrics.&lt;/li&gt;
 &lt;li&gt;The deletion rate graph is fine and dandy, but for displaying deletion
 errors, an error ratio is more useful.&lt;/li&gt;
 &lt;li&gt;Error rates are currently based around summing the error rates from each
-individual component. A more holistic approach is important&lt;/li&gt;
+individual component. A more holistic approach is important.&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;p&gt;Over time I&amp;rsquo;ll address these. In some cases, I&amp;rsquo;m still figuring out which path

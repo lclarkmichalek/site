@@ -111,15 +111,16 @@ follow the naming convention of `<namespace>_<metric name>_<units>`. In this
 case, our namespace is the abbreviated name of our program, `stashdef`. The name
 of the metric is always a little contentious, but `kinesis_message_write` is an
 understandable description of the operation we're monitoring. The unit is even
-less clear, using `total`. There is debate whether `total` or `count` is clearer
-to use when you're counting something, but I use `total`, as `count` is often
-used by the default Prometheus libraries, and my use is not always compatible
-with their use.
+less clear, using `total`. `total` is used as the unit for counters (you may
+also see `count` used for similar things, but only in the context of summaries
+and histograms).
 
 The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
 dimensions. In Qubit, we have a convention of having a label on this kind of
-counter called result, which has two values: `success` and `failure`.
+counter called result, which has two values: `success` and `failure`. This isn't
+the convention in the broader community, where having a seperate metric for
+successes and failures is popular, but it's what we do at Qubit.
 
 The second metric is the variable `kinesisWriteDuration`, registered as
 `stashdef_kinesis_message_write_duration_seconds`. Much the same as the above,

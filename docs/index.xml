@@ -123,15 +123,16 @@ follow the naming convention of &lt;code&gt;&amp;lt;namespace&amp;gt;_&amp;lt;me
 case, our namespace is the abbreviated name of our program, &lt;code&gt;stashdef&lt;/code&gt;. The name
 of the metric is always a little contentious, but &lt;code&gt;kinesis_message_write&lt;/code&gt; is an
 understandable description of the operation we&amp;rsquo;re monitoring. The unit is even
-less clear, using &lt;code&gt;total&lt;/code&gt;. There is debate whether &lt;code&gt;total&lt;/code&gt; or &lt;code&gt;count&lt;/code&gt; is clearer
-to use when you&amp;rsquo;re counting something, but I use &lt;code&gt;total&lt;/code&gt;, as &lt;code&gt;count&lt;/code&gt; is often
-used by the default Prometheus libraries, and my use is not always compatible
-with their use.&lt;/p&gt;
+less clear, using &lt;code&gt;total&lt;/code&gt;. &lt;code&gt;total&lt;/code&gt; is used as the unit for counters (you may
+also see &lt;code&gt;count&lt;/code&gt; used for similar things, but only in the context of summaries
+and histograms).&lt;/p&gt;
 
 &lt;p&gt;The other thing to note about this metric is that we have a label on it.
 Prometheus allows you to add labels to your metrics, adding additional
 dimensions. In Qubit, we have a convention of having a label on this kind of
-counter called result, which has two values: &lt;code&gt;success&lt;/code&gt; and &lt;code&gt;failure&lt;/code&gt;.&lt;/p&gt;
+counter called result, which has two values: &lt;code&gt;success&lt;/code&gt; and &lt;code&gt;failure&lt;/code&gt;. This isn&amp;rsquo;t
+the convention in the broader community, where having a seperate metric for
+successes and failures is popular, but it&amp;rsquo;s what we do at Qubit.&lt;/p&gt;
 
 &lt;p&gt;The second metric is the variable &lt;code&gt;kinesisWriteDuration&lt;/code&gt;, registered as
 &lt;code&gt;stashdef_kinesis_message_write_duration_seconds&lt;/code&gt;. Much the same as the above,
@@ -150,6 +151,17 @@ operation is.&lt;/p&gt;
 everyone involved, and seconds is preferred for durations, given its SI status.
 All Prometheus metrics are 64 bit floating point numbers, so the number of cases
 where using seconds as a unit could cause issues is negligible.&lt;/p&gt;
+
+&lt;p&gt;There is one step missing here; registering the metrics with the Prometheus
+client. This can be done using &lt;code&gt;prometheus.MustRegister&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func init() {
+  prometheus.MustRegister(kinesisWriteCount)
+  prometheus.MustRegister(kinesisWriteDuration)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I&amp;rsquo;ll omit this step in future for the sake of brevity.&lt;/p&gt;
 
 &lt;p&gt;With our metrics set up, we can now instrument our publishing code.&lt;/p&gt;
 
@@ -495,13 +507,9 @@ then listens to the destination queue to see how long it takes before a message
 comes through. This exposes two main metrics&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;const (
-  stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
-    Name: &amp;quot;stashdef_lag_seconds&amp;quot;,
-    Help: &amp;quot;The last Stash deferred lag&amp;quot;,
-  })
-  stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-    Name: &amp;quot;stashdef_last_received_timestamp_seconds&amp;quot;,
-    Help: &amp;quot;The timestamp when we last received a message from Stash deferred&amp;quot;,
+  stashDeferredHeartbeatTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: &amp;quot;stashdef_heartbeat_timestamp_seconds&amp;quot;,
+    Help: &amp;quot;The time when the last received message was scheduled&amp;quot;,
   })
 )
 &lt;/code&gt;&lt;/pre&gt;
@@ -516,9 +524,7 @@ in talking to the frontend of the service, though it looks a little like.&lt;/p&
 }
 func receiver(...) {
   for msg := range receiveMessages() {
-    lag := time.Since(msg.SentAt)
-    stashDeferredLag.Set(float64(lag) / float64(time.Second))
-    stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+    stashDeferredHeartbeatTimestamp.Set(msg.SentAt)
   }
 }
 &lt;/code&gt;&lt;/pre&gt;
@@ -532,14 +538,8 @@ that happens.&lt;/p&gt;
 &lt;p&gt;The current lag can then be calculated as the time since we got a message, plus
 the lag on that message. This looks like&lt;/p&gt;
 
-&lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+&lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;time() - stashdef_heartbeat_timestamp_seconds
 &lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;We don’t just track the &lt;code&gt;stashdef_lag_seconds&lt;/code&gt; as if the lag monitor were to
-fail, that metric would stop updating. The safest measure of lag is the lag
-measured by the lag monitor plus the time since we last measured that lag, as if
-the lag monitor fails, the result of &lt;code&gt;time()&lt;/code&gt; will continue increasing
-regardless.&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&#34;http://generictestdomain.net/imgs/stash-deferred/stash-lag.png&#34; alt=&#34;stash-lag&#34; /&gt;&lt;/p&gt;
 
@@ -548,12 +548,14 @@ regardless.&lt;/p&gt;
 which steadily increases, while the last received metric resets every time we get
 a message. &lt;code&gt;time()&lt;/code&gt; returns the current unix epoch time in seconds. Because all
 Prometheus metrics are 64 bit floating point numbers, we still get subsecond
-granularity.&lt;/p&gt;
+granularity, though our &lt;code&gt;stashdef_heartbeat_timestamp_seconds&lt;/code&gt; reports integers,
+causing even more spikeyness. However, the metric stays in the range of 40 to 60
+seconds, which is what we expect.&lt;/p&gt;
 
 &lt;p&gt;This is the metric I want to alert on. Let&amp;rsquo;s write a Prometheus alert on this&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;job:stashdef_lag:seconds =
-  (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+  time() - max(stashdef_heartbeat_timestamp_seconds)
 
 ALERT StashDeferredLagHigh
   IF job:stashdef_lag:seconds &amp;gt; 5 * 60
@@ -607,13 +609,21 @@ and is mostly there so I can say &amp;lsquo;look how efficient it is!&amp;rsquo;
 component restarts well, which is very useful during incidents.&lt;/li&gt;
 &lt;/ol&gt;
 
-&lt;p&gt;In the future, as I gain more experience operating this service, I plan to
-demote some of the duration metrics to below the fold on this dashboard, as they
-seem to be subject to seemingly alarming changes under completely normal
-operation (I have a theory relating to tablet merging in BigTable, but even
-then, if that knowledge is not available in the dashboard, the graph is
-misleading). I also hope to spend some time addressing dropped messages in a
-more holistic manner in the lag monitor component.&lt;/p&gt;
+&lt;p&gt;This dashboard still has some major issues though:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;The displayed latencies are taking up a large amount of space for a small
+amount of value. I plan to relegate 3 of them below the fold, and use some of
+the space for some more useful metrics.&lt;/li&gt;
+&lt;li&gt;The deletion rate graph is fine and dandy, but for displaying deletion
+errors, an error ratio is more useful.&lt;/li&gt;
+&lt;li&gt;Error rates are currently based around summing the error rates from each
+individual component. A more holistic approach is important&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Over time I&amp;rsquo;ll address these. In some cases, I&amp;rsquo;m still figuring out which path
+to take (which latency plot is actually useful?), and in others, I just haven&amp;rsquo;t
+gotten around to it.&lt;/p&gt;
 </description>
     </item>
     

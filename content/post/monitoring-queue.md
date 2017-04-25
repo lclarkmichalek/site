@@ -607,10 +607,16 @@ The additions made here are:
    and is mostly there so I can say 'look how efficient it is!'. It also shows
    component restarts well, which is very useful during incidents.
 
-In the future, as I gain more experience operating this service, I plan to
-demote some of the duration metrics to below the fold on this dashboard, as they
-seem to be subject to seemingly alarming changes under completely normal
-operation (I have a theory relating to tablet merging in BigTable, but even
-then, if that knowledge is not available in the dashboard, the graph is
-misleading). I also hope to spend some time addressing dropped messages in a
-more holistic manner in the lag monitor component.
+This dashboard still has some major issues though:
+
+1. The displayed latencies are taking up a large amount of space for a small
+   amount of value. I plan to relegate 3 of them below the fold, and use some of
+   the space for some more useful metrics.
+2. The deletion rate graph is fine and dandy, but for displaying deletion
+   errors, an error ratio is more useful.
+3. Error rates are currently based around summing the error rates from each
+   individual component. A more holistic approach is important
+
+Over time I'll address these. In some cases, I'm still figuring out which path
+to take (which latency plot is actually useful?), and in others, I just haven't
+gotten around to it.

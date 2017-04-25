@@ -506,13 +506,9 @@ comes through. This exposes two main metrics
 
 ```go
 const (
-  stashDeferredLag = prometheus.NewGauge(prometheus.GaugeOpts{
-    Name: "stashdef_lag_seconds",
-    Help: "The last Stash deferred lag",
-  })
-  stashDeferredLastReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-    Name: "stashdef_last_received_timestamp_seconds",
-    Help: "The timestamp when we last received a message from Stash deferred",
+  stashDeferredHeartbeatTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: "stashdef_heartbeat_timestamp_seconds",
+    Help: "The time when the last received message was scheduled",
   })
 )
 ```
@@ -528,9 +524,7 @@ func sender(...) {
 }
 func receiver(...) {
   for msg := range receiveMessages() {
-    lag := time.Since(msg.SentAt)
-    stashDeferredLag.Set(float64(lag) / float64(time.Second))
-    stashDeferredLastReceived.Set(time.Now().UnixNano() / 1e9)
+    stashDeferredHeartbeatTimestamp.Set(msg.SentAt)
   }
 }
 ```
@@ -545,14 +539,8 @@ The current lag can then be calculated as the time since we got a message, plus
 the lag on that message. This looks like
 
 ```rule
-(time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+time() - stashdef_heartbeat_timestamp_seconds
 ```
-
-We don’t just track the `stashdef_lag_seconds` as if the lag monitor were to
-fail, that metric would stop updating. The safest measure of lag is the lag
-measured by the lag monitor plus the time since we last measured that lag, as if
-the lag monitor fails, the result of `time()` will continue increasing
-regardless.
 
 ![stash-lag](/imgs/stash-deferred/stash-lag.png)
 
@@ -567,7 +555,7 @@ This is the metric I want to alert on. Let's write a Prometheus alert on this
 
 ```rule
 job:stashdef_lag:seconds =
-  (time() - max(stashdef_last_received_timestamp_seconds)) + max(stashdef_lag_seconds)
+  time() - max(stashdef_heartbeat_timestamp_seconds)
 
 ALERT StashDeferredLagHigh
   IF job:stashdef_lag:seconds > 5 * 60

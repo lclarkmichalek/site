@@ -50,7 +50,7 @@ This post aims to go through a real service in production at Qubit, and the metr
 
 
 <meta itemprop="dateModified" content="2017-04-01T21:13:56&#43;01:00" />
-<meta itemprop="wordCount" content="3807">
+<meta itemprop="wordCount" content="3804">
 
 
 
@@ -625,8 +625,8 @@ question whether this really constitutes monitoring for this service, but if the
 frontend goes down, then my service&rsquo;s users are affected, so I want to know when
 that happens.</p>
 
-<p>The current lag can then be calculated as the time since we got a message, plus
-the lag on that message. This looks like</p>
+<p>The current lag can then be calculated as the time since the last message we got
+was scheduled. This looks like</p>
 
 <pre><code class="language-rule">time() - stashdef_heartbeat_timestamp_seconds
 </code></pre>

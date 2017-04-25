@@ -534,8 +534,8 @@ question whether this really constitutes monitoring for this service, but if the
 frontend goes down, then my service&amp;rsquo;s users are affected, so I want to know when
 that happens.&lt;/p&gt;
 
-&lt;p&gt;The current lag can then be calculated as the time since we got a message, plus
-the lag on that message. This looks like&lt;/p&gt;
+&lt;p&gt;The current lag can then be calculated as the time since the last message we got
+was scheduled. This looks like&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-rule&#34;&gt;time() - stashdef_heartbeat_timestamp_seconds
 &lt;/code&gt;&lt;/pre&gt;
